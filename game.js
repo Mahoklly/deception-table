@@ -169,7 +169,7 @@ for(let i=1;i<4;i++){
   // FIX: Position NPC properly above the table
   const cb = new THREE.Box3().setFromObject(a.inner);
   const npcHeight = cb.max.y - cb.min.y;
-  a.baseY = tableTopY + 0.65;  // Sit on chair, not under table
+  a.baseY = tableTopY + 0.45; // Sit on chair, not under table
   a.inner.position.y = a.baseY;
   
   // Add chair
