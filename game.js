@@ -174,12 +174,12 @@ for(let i=1;i<4;i++){
   
   // Add chair
   const st = SEATS[i];
-  const ch = makeChair();
-  const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.12);
-  ch.position.copy(st.pos).add(out);
-  ch.position.y = 0;  // Chair sits on floor
-  ch.rotation.y = st.rotY;
-  scene.add(ch);
+const ch = makeChair();
+const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.12);
+ch.position.copy(st.pos).add(out);
+ch.position.y = 0.25;  // Raise chair slightly so it looks right
+ch.rotation.y = st.rotY;
+scene.add(ch);
   
   a.group.add(a.inner);
   actors[i] = a;
