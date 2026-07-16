@@ -144,7 +144,7 @@ texLoader.load(assetSrc("bg_tavern","bg_tavern.jpg"), tex=>{
   backdrop = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, h, 48, 1, true, Math.PI*0.6, Math.PI*1.8),
     new THREE.MeshBasicMaterial({map:tex, side:THREE.BackSide, fog:false}));
   backdrop.position.y = h/2 - 0.4;
-  backdrop.material.color = new THREE.Color(0.82,0.8,0.78);
+  backdrop.material.color = new THREE.Color(0.95,0.92,0.88);
   scene.add(backdrop);
 }, undefined, ()=>{ /* missing backdrop: fog + darkness carries the mood */ });
 
