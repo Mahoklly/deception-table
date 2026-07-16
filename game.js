@@ -51,7 +51,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 const DPR_CAP = 1.5;
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x070503, 0.16);
+scene.fog = new THREE.FogExp2(0x070503, 0.055);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 60);
 const CAM_BASE = new THREE.Vector3(0, 1.15, 1.9);
 const CAM_LOOK = new THREE.Vector3(0, 1.06, -0.35);
@@ -62,14 +62,15 @@ function resize(){
   renderer.setPixelRatio(dpr);
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth/innerHeight;
-  camera.fov = innerWidth < innerHeight ? 62 : 46;   // wider on portrait phones
+  camera.fov = innerWidth < innerHeight ? 66 : 52;   // wider on portrait phones
   camera.updateProjectionMatrix();
 }
 addEventListener("resize", resize); addEventListener("orientationchange", resize); resize();
 
 /* lights: one warm candle cutting through cold darkness (style blocks 3-4) */
-scene.add(new THREE.AmbientLight(0x2a3038, 0.55));
-const candle = new THREE.PointLight(0xffb457, 2.6, 9, 1.6); candle.position.set(0,1.15,0); scene.add(candle);
+scene.add(new THREE.AmbientLight(0x3a4048, 0.9));
+const fill = new THREE.PointLight(0x9aa6b8, 0.8, 11, 1.4); fill.position.set(0,1.7,2.3); scene.add(fill);
+const candle = new THREE.PointLight(0xffb457, 3.4, 13, 1.4); candle.position.set(0,1.15,0); scene.add(candle);
 const lantern = new THREE.SpotLight(0xe08a2e, 55, 14, 0.7, 0.55, 1.8);
 lantern.position.set(0,3.4,0.4); lantern.target.position.set(0,0.9,-0.4); scene.add(lantern, lantern.target);
 const rim = new THREE.DirectionalLight(0x24343e, 0.7); rim.position.set(-3,2.5,-4); scene.add(rim);
@@ -83,20 +84,20 @@ let backdrop = null;
 texLoader.load(assetSrc("bg_tavern","bg_tavern.jpg"), tex=>{
   tex.colorSpace = THREE.SRGBColorSpace;
   const h = 7, w = h*16/9;
-  backdrop = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 8.5, h, 48, 1, true, Math.PI*0.6, Math.PI*1.8),
-    new THREE.MeshBasicMaterial({map:tex, side:THREE.BackSide, fog:true}));
+  backdrop = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, h, 48, 1, true, Math.PI*0.6, Math.PI*1.8),
+    new THREE.MeshBasicMaterial({map:tex, side:THREE.BackSide, fog:false}));
   backdrop.position.y = h/2 - 0.4;
-  backdrop.material.color = new THREE.Color(0.62,0.6,0.58);
+  backdrop.material.color = new THREE.Color(0.82,0.8,0.78);
   scene.add(backdrop);
 }, undefined, ()=>{ /* missing backdrop: fog + darkness carries the mood */ });
 
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
 const SEATS = [
-  { pos:new THREE.Vector3(0,0, 1.55), rotY:Math.PI },
-  { pos:new THREE.Vector3(-1.62,0, 0.0), rotY: Math.PI/2 },
-  { pos:new THREE.Vector3(0,0,-1.62), rotY: 0 },
-  { pos:new THREE.Vector3(1.62,0, 0.0), rotY:-Math.PI/2 },
+  { pos:new THREE.Vector3(0,0, 1.55),      rotY: Math.PI },
+  { pos:new THREE.Vector3(-1.28,0,-0.18),  rotY: Math.atan2(1.28, 0.18) },
+  { pos:new THREE.Vector3(0,0,-1.42),      rotY: 0 },
+  { pos:new THREE.Vector3(1.28,0,-0.18),   rotY: -Math.atan2(1.28, 0.18) },
 ];
 const loader = new GLTFLoader();
 function loadGLB(key, file){ return new Promise(res=>loader.load(assetSrc(key,file), g=>res(g.scene), undefined, ()=>res(null))); }
@@ -131,7 +132,8 @@ function makeActorShell(seatIdx){
   return { seat:seatIdx, group, inner:null, alive:true, breathe:rng()*6.28, lean:0, slump:0, glance:0, glanceDir:0 };
 }
 
-let table=null, revolver=null;
+let table=null, revolver=null, tableTopY=0.95, worldReady=false, cardBackTex=null;
+const cards=[];
 const revolverHome = new THREE.Vector3(0.28, 0, 0.15);
 async function loadWorld(){
   const [gTable, gBrute, gWidow, gFox, gGun] = await Promise.all([
@@ -146,8 +148,9 @@ async function loadWorld(){
   scene.add(table);
   // table top height for props
   const tb = new THREE.Box3().setFromObject(table);
-  revolverHome.y = tb.max.y + 0.005;
-  candle.position.y = tb.max.y + 0.24;
+  tableTopY = tb.max.y;
+  revolverHome.y = tableTopY + 0.005;
+  candle.position.y = tableTopY + 0.26;
 
   const models = [null, gBrute, gWidow, gFox];
   for(let i=1;i<4;i++){
@@ -160,10 +163,13 @@ async function loadWorld(){
   }
   actors[0] = { seat:0, group:null, alive:true, npc:null }; // the player
 
-  revolver = gGun ? normalize(gGun, 0.16) :
+  const gunMesh = gGun ? normalize(gGun, 0.2) :
     new THREE.Mesh(new THREE.BoxGeometry(0.22,0.08,0.05), new THREE.MeshStandardMaterial({color:0x5a5a5f,roughness:0.4,metalness:0.7}));
+  revolver = new THREE.Group(); revolver.add(gunMesh);
   revolver.position.copy(revolverHome); revolver.rotation.y = rng()*6.28;
   scene.add(revolver);
+  buildTableCards();
+  worldReady = true;
 }
 
 /* ---------------- overlay DOM helpers ---------------- */
@@ -253,7 +259,6 @@ function setupCardHUD(){
   c.title = STR.hold_to_peek;
   const peek=on=>c.classList.toggle("peek",on);
   c.onpointerdown=()=>peek(true); c.onpointerup=c.onpointerleave=()=>peek(false);
-  peek(true); setTimeout(()=>peek(false), 2600);
 }
 
 /* ---------- word AI ---------- */
@@ -402,11 +407,96 @@ async function executeSeat(victim){
   revolver.rotation.set(0,rng()*6.28,0);
 }
 
+/* ---------------- physical cards on the table ---------------- */
+function cardFaceTexture(isImp){
+  const cv=document.createElement("canvas"); cv.width=256; cv.height=384;
+  const g=cv.getContext("2d");
+  const grad=g.createLinearGradient(0,0,256,384);
+  grad.addColorStop(0,"#efe3c0"); grad.addColorStop(1,"#c6b184");
+  g.fillStyle=grad; g.fillRect(0,0,256,384);
+  g.strokeStyle="#7a2e22"; g.lineWidth=8; g.strokeRect(10,10,236,364);
+  g.textAlign="center"; g.fillStyle="#6b5537";
+  g.font="18px Georgia"; g.fillText(STR.your_card_label.toUpperCase(),128,86);
+  const word = isImp ? STR.imposter_card : G.card.secret;
+  g.fillStyle = isImp ? "#a92a1c" : "#241708";
+  g.font="bold 40px Georgia";
+  if(g.measureText(word).width>210) g.font="bold 30px Georgia";
+  g.fillText(word,128,200);
+  if(isImp){ g.fillStyle="#7a2e22"; g.font="italic 20px Georgia";
+    g.fillText(fmt(STR.imposter_hint,{h:G.card.hint}),128,258); }
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+function buildTableCards(){
+  const backTex = cardBackTex = texLoader.load(assetSrc("card_back","card_back.png"));
+  backTex.colorSpace = THREE.SRGBColorSpace;
+  for(let i=0;i<4;i++){
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15,0.22),
+      new THREE.MeshStandardMaterial({map:backTex, side:THREE.DoubleSide, roughness:0.7}));
+    const grp = new THREE.Group(); grp.add(m);
+    const dir = SEATS[i].pos.clone().setY(0).normalize();
+    grp.position.set(dir.x*0.66, tableTopY+0.006, dir.z*0.66);
+    grp.rotation.set(-Math.PI/2, 0, (rng()-0.5)*0.5);
+    grp.userData.home = { p:grp.position.clone(), r:grp.rotation.clone() };
+    grp.userData.mesh = m;
+    scene.add(grp); cards[i]=grp;
+  }
+}
+async function tweenTo(obj, p, r, ms){
+  const p0=obj.position.clone(), r0={x:obj.rotation.x,y:obj.rotation.y,z:obj.rotation.z};
+  const steps=Math.max(2,Math.round(ms/16));
+  for(let s=1;s<=steps;s++){
+    const t=s/steps, e=t*t*(3-2*t); // smoothstep
+    obj.position.lerpVectors(p0,p,e);
+    obj.rotation.set(r0.x+(r.x-r0.x)*e, r0.y+(r.y-r0.y)*e, r0.z+(r.z-r0.z)*e);
+    await sleep(16);
+  }
+}
+function waitTap(maxMs){
+  return new Promise(res=>{
+    let done=false;
+    const fin=()=>{ if(done) return; done=true; removeEventListener("pointerdown",fin); res(); };
+    addEventListener("pointerdown",fin);
+    sleep(maxMs).then(fin);
+  });
+}
+async function dealCardsSequence(){
+  while(!worldReady) await sleep(120);
+  play("card");
+  // reset cards to their table spots (back design up)
+  for(const c of cards){
+    c.position.copy(c.userData.home.p); c.rotation.copy(c.userData.home.r);
+    c.userData.mesh.material.map = cardBackTex; c.userData.mesh.material.needsUpdate = true;
+  }
+  setPrompt(STR.deal_prompt);
+  // NPCs lift their cards to read them (faces tilted away from you)
+  const npcPeeks = [1,2,3].map(async (i, k)=>{
+    await sleep(350*k + 250);
+    const c=cards[i], seat=SEATS[i];
+    const up = new THREE.Vector3(seat.pos.x*0.8, tableTopY+0.45, seat.pos.z*0.8);
+    const outY = Math.atan2(seat.pos.x, seat.pos.z);
+    await tweenTo(c, up, {x:-0.4, y:outY, z:0}, 550);
+    await sleep(900+rng()*500);
+    await tweenTo(c, c.userData.home.p, c.userData.home.r, 500);
+  });
+  // your card comes up to your face
+  const mine = cards[0];
+  const face = cardFaceTexture(G.imposterSeat===0);
+  await sleep(200);
+  await tweenTo(mine, new THREE.Vector3(0.14, 1.0, 1.36), {x:-0.16, y:0, z:0.04}, 650);
+  mine.userData.mesh.material.map = face; mine.userData.mesh.material.needsUpdate = true;
+  setPrompt(STR.tap_to_place);
+  await waitTap(8000);
+  mine.userData.mesh.material.map = cardBackTex; mine.userData.mesh.material.needsUpdate = true;
+  await tweenTo(mine, mine.userData.home.p, mine.userData.home.r, 550);
+  await Promise.all(npcPeeks);
+  setPrompt("");
+}
+
 /* ---------------- match flow ---------------- */
 async function runMatch(){
   newMatch();
   setupCardHUD();
-  play("card");
+  await dealCardsSequence();
   setBanner("", 1);
   $("myCard").style.display="block";
   let order = aliveSeats();

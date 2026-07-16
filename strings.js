@@ -39,6 +39,8 @@ export const STR = {
   votes_for: "{c} vote{s}",
   you: "You",
   dead_tag: "✝",
+  deal_prompt: "The cards are dealt. Pick yours up…",
+  tap_to_place: "Read it well — then tap anywhere to set it face-down.",
   tut_1: "Everyone says one word per round related to the secret card.",
   tut_2: "Bold words prove you're innocent — but teach the imposter the secret.",
   tut_3: "Sly words protect the secret — but make YOU look like the imposter.",
