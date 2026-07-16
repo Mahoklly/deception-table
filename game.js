@@ -53,7 +53,7 @@ const DPR_CAP = 1.5;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x070503, 0.055);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 60);
-const CAM_BASE = new THREE.Vector3(0, 1.0, 1.5);
+const CAM_BASE = new THREE.Vector3(0, 1.5, 1.6);
 const CAM_LOOK = new THREE.Vector3(0, 0.9, -0.6);
 let camYaw=0, camPitch=0, camYawT=0, camPitchT=0;
 addEventListener("pointermove", e=>{
@@ -169,7 +169,7 @@ for(let i=1;i<4;i++){
   // FIX: Position NPC properly above the table
   const cb = new THREE.Box3().setFromObject(a.inner);
   const npcHeight = cb.max.y - cb.min.y;
-  a.baseY = tableTopY + 0.45; // Sit on chair, not under table
+  a.baseY = tableTopY + 0.45;// Sit on chair, not under table
   a.inner.position.y = a.baseY;
   
   // Add chair
@@ -177,7 +177,7 @@ for(let i=1;i<4;i++){
 const ch = makeChair();
 const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.12);
 ch.position.copy(st.pos).add(out);
-ch.position.y = 0.25;  // Raise chair slightly so it looks right
+ch.position.y = 0;
 ch.rotation.y = st.rotY;
 scene.add(ch);
   
