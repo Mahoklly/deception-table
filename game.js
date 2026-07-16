@@ -25,7 +25,11 @@ function pumpWaiters(){ for(let i=waiters.length-1;i>=0;i--){ if(clock.t>=waiter
 const SND = {};
 const audioUnlocked = { v:false };
 function loadAudio(id, file, {loop=false, vol=1}={}){
-  const a = new Audio(assetSrc(id==="music"?"music_tavern":id==="shot"?"sfx_gunshot":id==="click"?"sfx_click":id==="card"?"sfx_card":"sfx_drum", file)); a.crossOrigin="anonymous"; a.preload="auto"; a.loop=loop; a.volume=vol;
+  const a = new Audio(assetSrc(id==="music"?"music_tavern":id==="shot"?"sfx_gunshot":id==="click"?"sfx_click":id==="card"?"sfx_card":"sfx_drum", file));
+  a.crossOrigin="anonymous";
+  a.preload="auto";
+  a.loop=loop;
+  a.volume = vol;
   a.addEventListener("error", ()=>{ SND[id]=null; });
   SND[id]=a;
 }
@@ -40,7 +44,53 @@ function unlockAudio(){ if(audioUnlocked.v) return; audioUnlocked.v=true; play("
 /* ---------------- input: everything becomes a command object ---------------- */
 const BIND = { Digit1:"w1", Digit2:"w2", Digit3:"w3", Digit4:"w4", KeyV:"vote", Space:"confirm", Enter:"confirm" };
 const commandQueue = [];
-addEventListener("keydown", e=>{ const c=BIND[e.code]; if(c){ commandQueue.push(c); e.preventDefault(); } unlockAudio(); });
+addEventListener("keydown", e=>{
+  const c=BIND[e.code];
+  if(c){ commandQueue.push(c); e.preventDefault(); unlockAudio(); }
+  // --- NEW: ESC to open/close settings ---
+  if(e.code === "Escape"){
+    toggleSettings();
+    e.preventDefault();
+  }
+});
+
+/* ---------------- Settings Menu ---------------- */
+let settingsOpen = false;
+const settingsEl = document.getElementById("settingsMenu");
+const volumeSlider = document.getElementById("volumeSlider");
+const volumeLabel = document.getElementById("volumeLabel");
+
+function toggleSettings(){
+  settingsOpen = !settingsOpen;
+  if(settingsOpen){
+    settingsEl.style.display = "flex";
+    // Sync slider with current volume
+    const currentVol = SND.music ? Math.round(SND.music.volume * 100) : 28;
+    volumeSlider.value = currentVol;
+    volumeLabel.textContent = currentVol + "%";
+  } else {
+    settingsEl.style.display = "none";
+  }
+}
+
+// Volume slider event
+volumeSlider.addEventListener("input", function(){
+  const val = parseInt(this.value);
+  volumeLabel.textContent = val + "%";
+  if(SND.music){
+    SND.music.volume = val / 100;
+    // If music isn't playing, start it
+    if(!SND.music.paused === false){
+      SND.music.play().catch(()=>{});
+    }
+  }
+});
+
+document.getElementById("settingsBtn").addEventListener("click", toggleSettings);
+
+// Close button
+document.getElementById("closeSettingsBtn").addEventListener("click", toggleSettings);
+
 addEventListener("pointerdown", unlockAudio, {once:false});
 
 /* ---------------- renderer / scene ---------------- */
