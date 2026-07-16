@@ -1,6 +1,7 @@
 // Asset URL manifest — generated-asset CDN URLs (Higgsfield/CloudFront).
 // Empty string = fall back to a relative ./assets/ file (or procedural placeholder).
 export const ASSET_URLS = {
+  room_tavern: "", // hook up a Higgsfield-generated room_tavern.glb here to replace the procedural box/beam room
   char_brute: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/d134ef7d-8897-429d-ba67-8a2ca0ea9484.glb",
   char_widow: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/eca7c860-910f-4e08-acc1-b5cfee087784.glb",
   char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",

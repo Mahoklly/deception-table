@@ -99,6 +99,8 @@ const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const DPR_CAP = 1.5;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x070503, 0.055);
@@ -128,26 +130,92 @@ addEventListener("resize", resize); addEventListener("orientationchange", resize
 scene.add(new THREE.AmbientLight(0x3a4048, 0.9));
 const fill = new THREE.PointLight(0x9aa6b8, 0.8, 11, 1.4); fill.position.set(0,1.7,2.3); scene.add(fill);
 const candle = new THREE.PointLight(0xffb457, 3.4, 13, 1.4); candle.position.set(0,1.15,0); scene.add(candle);
+candle.castShadow = true;
+candle.shadow.mapSize.set(1024,1024);
+candle.shadow.camera.near = 0.05; candle.shadow.camera.far = 12; candle.shadow.bias = -0.003;
 const lantern = new THREE.SpotLight(0xe08a2e, 55, 14, 0.7, 0.55, 1.8);
 lantern.position.set(0,3.4,0.4); lantern.target.position.set(0,0.9,-0.4); scene.add(lantern, lantern.target);
+lantern.castShadow = true;
+lantern.shadow.mapSize.set(1024,1024);
+lantern.shadow.camera.near = 0.3; lantern.shadow.camera.far = 14; lantern.shadow.bias = -0.0025;
 const rim = new THREE.DirectionalLight(0x24343e, 0.7); rim.position.set(-3,2.5,-4); scene.add(rim);
+/* generic helper: flag every mesh in a subtree to cast/receive real-time shadows */
+function enableShadow(obj, cast=true, recv=true){
+  obj.traverse(m=>{ if(m.isMesh){ m.castShadow = cast; m.receiveShadow = recv; } });
+  return obj;
+}
 
-/* floor + backdrop */
-const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 40),
+/* floor: real ground-plane geometry, physically lit and shadow-receiving */
+const ROOM_R = 6.6, WALL_H = 4.3;
+const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_R, 48),
   new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9}));
-floor.rotation.x = -Math.PI/2; scene.add(floor);
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
 const texLoader = new THREE.TextureLoader();
-let backdrop = null;
-texLoader.load(assetSrc("bg_tavern","bg_tavern.jpg"), tex=>{
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const h = 7, w = h*16/9;
-  backdrop = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, h, 48, 1, true, Math.PI*0.6, Math.PI*1.8),
-    new THREE.MeshBasicMaterial({map:tex, side:THREE.BackSide, fog:false}));
-  backdrop.position.y = h/2 - 0.4;
-  backdrop.material.color = new THREE.Color(0.95,0.92,0.88);
-  scene.add(backdrop);
-}, undefined, ()=>{ /* missing backdrop: fog + darkness carries the mood */ });
-/* ---- 3D midground props: real parallax between table and backdrop ---- */
+let roomGroup = null;
+
+/* ---- true 3D tavern room: walled polygon, beamed ceiling, built-in hearth ----
+   Real box/cylinder geometry with physical X/Y/Z coordinates — no flat
+   backdrop image or skybox trick. Replaced at runtime if a Higgsfield-
+   generated room_tavern.glb is hooked up (see loadWorld()). */
+function buildRoom(){
+  const g = new THREE.Group();
+  const plaster = new THREE.MeshStandardMaterial({color:0x362a1c, roughness:0.95});
+  const trim    = new THREE.MeshStandardMaterial({color:0x1c130a, roughness:0.9});
+  const beamMat = new THREE.MeshStandardMaterial({color:0x18100a, roughness:0.85});
+  const stone   = new THREE.MeshStandardMaterial({color:0x4a4438, roughness:0.9});
+  const log     = new THREE.MeshStandardMaterial({color:0x2a1c10, roughness:0.85});
+
+  const SIDES = 10, segAngle = (Math.PI*2)/SIDES;
+  const segW = 2*ROOM_R*Math.tan(segAngle/2)*1.03;
+  for(let i=0;i<SIDES;i++){
+    const ang = segAngle*i;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(segW, WALL_H, 0.28), plaster);
+    wall.position.set(Math.sin(ang)*ROOM_R, WALL_H/2, Math.cos(ang)*ROOM_R);
+    wall.rotation.y = ang;
+    g.add(wall);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.24, 0.34), trim);
+    base.position.set(Math.sin(ang)*ROOM_R, 0.12, Math.cos(ang)*ROOM_R);
+    base.rotation.y = ang;
+    g.add(base);
+  }
+  // beamed ceiling — a real cap mesh plus radiating box beams above the lantern
+  const ceiling = new THREE.Mesh(new THREE.CylinderGeometry(ROOM_R*1.02, ROOM_R*1.02, 0.22, SIDES),
+    new THREE.MeshStandardMaterial({color:0x120b06, roughness:0.95, side:THREE.DoubleSide}));
+  ceiling.position.y = WALL_H;
+  g.add(ceiling);
+  for(let i=0;i<6;i++){
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.2, ROOM_R*1.9), beamMat);
+    beam.position.y = WALL_H - 0.16;
+    beam.rotation.y = (Math.PI/6)*i;
+    g.add(beam);
+  }
+  // built-in stone hearth against the back wall, feeding the fireplace point light
+  const hearthPos = new THREE.Vector3(1.6, 0, -Math.sqrt(ROOM_R*ROOM_R - 1.6*1.6));
+  const alcove = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.9, 0.6), stone);
+  alcove.position.set(hearthPos.x, 0.95, hearthPos.z + 0.25);
+  g.add(alcove);
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.15, 0.5), new THREE.MeshStandardMaterial({color:0x0a0605, roughness:1}));
+  mouth.position.set(hearthPos.x, 0.62, hearthPos.z + 0.5);
+  g.add(mouth);
+  for(let i=0;i<4;i++){
+    const l = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.7,8), log);
+    l.rotation.z = Math.PI/2; l.rotation.y = i*0.5;
+    l.position.set(hearthPos.x + (i-1.5)*0.05, 0.1, hearthPos.z + 0.55);
+    g.add(l);
+  }
+  scene.add(g);
+  enableShadow(g);
+  return g;
+}
+roomGroup = buildRoom();
+const fireplace = new THREE.PointLight(0xff7a3c, 2.2, 9, 1.7);
+fireplace.position.set(1.6, 0.55, roomGroup ? -Math.sqrt(ROOM_R*ROOM_R - 1.6*1.6) + 0.5 : -4.4);
+fireplace.castShadow = true;
+fireplace.shadow.mapSize.set(512,512);
+fireplace.shadow.camera.near = 0.1; fireplace.shadow.camera.far = 9;
+scene.add(fireplace);
+
+/* ---- 3D midground props: real geometry between the table and the walls ---- */
 {
   const wood = new THREE.MeshStandardMaterial({color:0x4a2f18, roughness:0.85});
   const dark = new THREE.MeshStandardMaterial({color:0x2e1c0d, roughness:0.9});
@@ -160,20 +228,17 @@ texLoader.load(assetSrc("bg_tavern","bg_tavern.jpg"), tex=>{
       const r = new THREE.Mesh(new THREE.TorusGeometry(0.315*s,0.02,6,18), iron);
       r.rotation.x = Math.PI/2; r.position.y = hy*s; g.add(r);
     }
-    g.position.set(x,0,z); g.rotation.y = Math.random()*6.28; scene.add(g);
+    g.position.set(x,0,z); g.rotation.y = Math.random()*6.28; enableShadow(g); scene.add(g);
   };
   const crate = (x,z,s=1)=>{
     const c = new THREE.Mesh(new THREE.BoxGeometry(0.62*s,0.62*s,0.62*s), dark);
-    c.position.set(x,0.31*s,z); c.rotation.y = Math.random()*1.2; scene.add(c);
+    c.position.set(x,0.31*s,z); c.rotation.y = Math.random()*1.2; c.castShadow=true; c.receiveShadow=true; scene.add(c);
   };
-  // clusters behind/beside the NPCs, between table (r≈1) and backdrop (r=6.5)
+  // clusters behind/beside the NPCs, between table (r≈1) and the walls (r=6.6)
   barrel(-3.4,-2.6,1.15); barrel(-2.8,-3.2); barrel(-3.7,-1.9,0.8);
   crate(-4.3, 0.5, 1.0);  crate(-3.9,-0.3, 0.85);
   barrel( 3.2,-3.0,0.95); crate( 3.4,-2.2, 1.1); crate( 3.9,-1.3, 0.9);
   barrel( 4.3, 0.4);
-  // warm glow spilling from the painted hearth onto the real floor
-  const ember = new THREE.PointLight(0xff7a3c, 1.4, 8, 1.7);
-  ember.position.set(1.6, 0.6, -4.4); scene.add(ember);
 }
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
@@ -220,15 +285,23 @@ let table=null, revolver=null, tableTopY=0.95, worldReady=false, cardBackTex=nul
 const cards=[];
 const revolverHome = new THREE.Vector3(0.28, 0, 0.15);
 async function loadWorld(){
-  const [gTable, gBrute, gWidow, gFox, gGun] = await Promise.all([
+  const [gRoom, gTable, gBrute, gWidow, gFox, gGun] = await Promise.all([
+    loadGLB("room_tavern","room_tavern.glb"),
     loadGLB("table_tavern","table_tavern.glb"), loadGLB("char_brute","char_brute.glb"),
     loadGLB("char_widow","char_widow.glb"), loadGLB("char_fox","char_fox.glb"), loadGLB("revolver","revolver.glb"),
   ]);
+  // swap the procedural box/beam room for a Higgsfield-generated one, if hooked up
+  if(gRoom){
+    if(roomGroup) scene.remove(roomGroup);
+    scene.add(enableShadow(gRoom));
+    roomGroup = gRoom;
+  }
   table = gTable ? normalize(gTable, 0.95) :
     (()=>{ const t=new THREE.Group();
       const top=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,0.09,28), new THREE.MeshStandardMaterial({color:0x3a2a16,roughness:0.8})); top.position.y=0.92; t.add(top);
       const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,0.92,10), new THREE.MeshStandardMaterial({color:0x2a1d10,roughness:0.9})); leg.position.y=0.46; t.add(leg);
       return t; })();
+  enableShadow(table);
   scene.add(table);
   // table top height for props
   const tb = new THREE.Box3().setFromObject(table);
@@ -242,9 +315,10 @@ for(let i=1;i<4;i++){
   const npc = NPCS[i-1];
   a.npc = npc;
   a.inner = models[i] ? normalize(models[i], tableTopY + 0.82) : placeholderChar(npc.chip);
+  enableShadow(a.inner);
   // grounded on the floor by normalize; remember that offset for the idle anim
   a.baseY = a.inner.position.y;
-  
+
   // Add chair
   const st = SEATS[i];
 const ch = makeChair();
@@ -252,8 +326,9 @@ const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.34);
 ch.position.copy(st.pos).add(out);
 ch.position.y = 0;
 ch.rotation.y = st.rotY;
+enableShadow(ch);
 scene.add(ch);
-  
+
   a.group.add(a.inner);
   actors[i] = a;
 }
@@ -262,6 +337,7 @@ scene.add(ch);
   const gunMesh = gGun ? normalize(gGun, 0.2) :
     new THREE.Mesh(new THREE.BoxGeometry(0.22,0.08,0.05), new THREE.MeshStandardMaterial({color:0x5a5a5f,roughness:0.4,metalness:0.7}));
   revolver = new THREE.Group(); revolver.add(gunMesh);
+  enableShadow(revolver);
   revolver.position.copy(revolverHome); revolver.rotation.y = rng()*6.28;
   scene.add(revolver);
   // hard-drop the revolver onto the real table surface (measured, not guessed)
