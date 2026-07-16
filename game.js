@@ -2,7 +2,7 @@
 // three.js scene + HTML overlay UI. Fixed-timestep sim, seeded RNG, command-object input.
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/addons/GLTFLoader.js";
-import { STR, fmt } from "./strings.js";
+import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js";
 import { DECK, NPCS, RULES } from "./data.js";
 import { ASSET_URLS } from "./assets_urls.js";
 const assetSrc = (key, rel) => ASSET_URLS[key] || ("./assets/"+rel);
@@ -90,6 +90,45 @@ document.getElementById("settingsBtn").addEventListener("click", toggleSettings)
 
 // Close button
 document.getElementById("closeSettingsBtn").addEventListener("click", toggleSettings);
+
+/* ---------------- language switch (English default, Kurdish Sorani secondary) ---------------- */
+// Re-applies every *static* piece of chrome text that was set once at boot
+// (title screen, settings labels) — dynamic prompts/banners read STR live
+// at call time already, so they don't need a refresh here.
+function applyStaticStrings(){
+  document.getElementById("titleBlurb").textContent = STR.title_blurb;
+  document.getElementById("startBtn").textContent = G.over ? STR.play_again : STR.start;
+  document.getElementById("title").querySelector("h1").innerHTML = STR.game_title_html;
+  document.getElementById("settingsTitle").textContent = STR.settings_title;
+  document.getElementById("settingsVolumeLabel").textContent = STR.settings_volume_label;
+  document.getElementById("settingsLanguageLabel").textContent = STR.settings_language_label;
+  document.getElementById("closeSettingsBtn").textContent = STR.settings_close;
+  if(!worldReady) document.getElementById("loadNote").textContent = STR.loading;
+}
+const langEnBtn = document.getElementById("langEnBtn");
+const langKuBtn = document.getElementById("langKuBtn");
+function updateLangButtons(){
+  const l = getLang();
+  langEnBtn.style.background = l==="en" ? "#7a2e22" : "#2a1d10";
+  langEnBtn.style.color      = l==="en" ? "#efe3c0" : "#c6b184";
+  langKuBtn.style.background = l==="ku" ? "#7a2e22" : "#2a1d10";
+  langKuBtn.style.color      = l==="ku" ? "#efe3c0" : "#c6b184";
+}
+function changeLang(l){
+  if(l===getLang()) return;
+  setLang(l);
+  updateLangButtons();
+  applyStaticStrings();
+  // nameplates are cached DOM elements — retext them in place, they won't
+  // otherwise pick up the swap until they're first created
+  for(const i of [1,2,3]){
+    const p = plateEls[i];
+    if(p && actors[i] && actors[i].npc) p.querySelector(".nm").textContent = npcName(actors[i].npc);
+  }
+}
+langEnBtn.addEventListener("click", ()=>changeLang("en"));
+langKuBtn.addEventListener("click", ()=>changeLang("ku"));
+updateLangButtons();
 
 addEventListener("pointerdown", unlockAudio, {once:false});
 
@@ -442,7 +481,7 @@ for(let i=1;i<4;i++){
   a.inner = models[i] ? normalize(models[i], tableTopY + 0.82) : placeholderChar(npc.chip);
   enableShadow(a.inner);
   // grounded on the floor by normalize; remember that offset for the idle anim
-  a.baseY = a.inner.position.y - 0.02;
+  a.baseY = a.inner.position.y;
 
   // Add chair
   const st = SEATS[i];
@@ -496,7 +535,7 @@ function mkBubble(i){
 }
 function mkPlate(i,name){
   const d=document.createElement("div"); d.className="plate";
-  d.innerHTML=`${name}<span class="sus"></span>`;
+  d.innerHTML=`<span class="nm">${name}</span><span class="sus"></span>`;
   platesL.appendChild(d); plateEls[i]=d; return d;
 }
 function headScreenPos(i, yOff=1.62){
@@ -540,10 +579,11 @@ const G = {
   heardCrewWords:0, voteCalled:false, extraRound:false, over:false,
 };
 const aliveSeats = ()=> [0,1,2,3].filter(i=>actors[i] && actors[i].alive);
-const nameOf = i => i===0 ? STR.you : actors[i].npc.name;
+const npcName = npc => getLang()==="ku" ? npc.name_ku : npc.name;
+const nameOf = i => i===0 ? STR.you : npcName(actors[i].npc);
 
 function newMatch(){
-  G.card = pick(DECK);
+  G.card = pick(DECK[getLang()]);
   G.imposterSeat = Math.floor(rng()*4);
   G.round = 1; G.maxRounds = RULES.maxRounds;
   G.usedWords = new Set(); G.spoken=[[],[],[],[]];
@@ -665,8 +705,9 @@ function offerVote(){
     for(const s of aliveSeats()){
       if(s===0) continue;
       const b=document.createElement("button"); b.className="voteBtn"; b.dataset.seat=s;
-      b.innerHTML=`<span class="chip" style="background:${actors[s].npc.chip}">${actors[s].npc.name[0]}</span>
-        <span class="nm">${actors[s].npc.name}</span><span class="tally"></span>`;
+      const nm = npcName(actors[s].npc);
+      b.innerHTML=`<span class="chip" style="background:${actors[s].npc.chip}">${nm[0]}</span>
+        <span class="nm">${nm}</span><span class="tally"></span>`;
       b.onclick=()=>res(s);
       row.appendChild(b);
     }
@@ -676,11 +717,11 @@ function offerVote(){
 /* ---------- actor animation cues ---------- */
 async function npcSpeak(seat, text, extraThink=0){
   const a=actors[seat], npc=a.npc;
-  setPrompt(fmt(STR.prompt_waiting,{n:npc.name}));
+  setPrompt(fmt(STR.prompt_waiting,{n:npcName(npc)}));
   const think = npc.thinkMs[0] + rng()*(npc.thinkMs[1]-npc.thinkMs[0]) + extraThink;
   a.lean = 1;
   await sleep(think);
-  showBubble(seat, npc.name, text, 2400);
+  showBubble(seat, npcName(npc), text, 2400);
   await sleep(2400);
   a.lean = 0;
 }
@@ -711,17 +752,17 @@ async function executeSeat(victim){
   
   if (isPlayer) {
     // Player was voted out — they must type the secret word
-    setPrompt("Type the secret word to prove you're innocent:");
-    
+    setPrompt(STR.proveword_prompt);
+
     // Create input field
     const input = document.createElement("input");
     input.type = "text";
     input.id = "wordInput";
-    input.placeholder = "Type the secret word...";
+    input.placeholder = STR.proveword_placeholder;
     input.style.cssText = "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding:12px 20px; font-size:24px; border:2px solid #7a2e22; border-radius:8px; background:#1a100a; color:#efe3c0; text-align:center; z-index:100; width:300px;";
-    
+
     const confirmBtn = document.createElement("button");
-    confirmBtn.textContent = "Confirm";
+    confirmBtn.textContent = STR.confirm_btn;
     confirmBtn.style.cssText = "position:absolute; top:calc(50% + 60px); left:50%; transform:translateX(-50%); padding:10px 40px; font-size:20px; background:#7a2e22; color:#efe3c0; border:none; border-radius:8px; cursor:pointer; z-index:100;";
     
     document.body.appendChild(input);
@@ -747,8 +788,8 @@ async function executeSeat(victim){
         provedInnocent = true;
         input.remove();
         confirmBtn.remove();
-        setBanner("✅ Innocent! You survive.", 2000);
-        setPrompt("You proved your innocence!");
+        setBanner(STR.banner_proved_innocent_you, 2000);
+        setPrompt(STR.prompt_proved_innocent_you);
         play("click");
         // Player survives — keep them alive
         actors[victim].alive = true;
@@ -758,36 +799,36 @@ async function executeSeat(victim){
         if (attempts >= maxAttempts) {
           input.remove();
           confirmBtn.remove();
-          setBanner(`❌ Wrong! The word was "${secretWord}". You die.`, 3000);
-          setPrompt("You failed to prove your innocence.");
+          setBanner(fmt(STR.banner_proved_wrong_final,{w:secretWord}), 3000);
+          setPrompt(STR.prompt_proved_failed_you);
           play("shot");
           flash();
           gunKick();
           actors[victim].alive = false;
           resolveVote("guilty");
         } else {
-          setPrompt(`❌ Wrong! ${maxAttempts - attempts} attempt(s) left. Type the secret word:`);
+          setPrompt(fmt(STR.prompt_proved_wrong_retry,{n:maxAttempts-attempts}));
           input.value = "";
           input.focus();
           play("click");
         }
       }
     };
-    
+
     confirmBtn.onclick = checkWord;
     input.onkeydown = (e) => { if (e.key === "Enter") checkWord(); };
-    
+
     // Wait for resolution (the resolveVote function will continue)
     await new Promise(res => window._resolveVote = res);
   } else {
     // NPC was voted out — they must type the secret word (simulated)
-    setPrompt(`${nameOf(victim)} must prove their innocence...`);
+    setPrompt(fmt(STR.prompt_proving_npc,{n:nameOf(victim)}));
     await sleep(1000);
-    
+
     const npc = actors[victim];
     const isImp = victim === G.imposterSeat;
     let guessedCorrect = false;
-    
+
     if (isImp) {
       // Imposter has a small chance to guess correctly (based on how many crew words they've heard)
       const chance = Math.min(0.15 + G.heardCrewWords * 0.05, 0.5);
@@ -798,15 +839,15 @@ async function executeSeat(victim){
       // Crew always knows the word
       guessedCorrect = true;
     }
-    
+
     if (guessedCorrect) {
-      setBanner(`✅ ${nameOf(victim)} is innocent! They survive.`, 2500);
-      setPrompt(`${nameOf(victim)} proved their innocence.`);
+      setBanner(fmt(STR.banner_proved_innocent_npc,{n:nameOf(victim)}), 2500);
+      setPrompt(fmt(STR.prompt_proved_innocent_npc,{n:nameOf(victim)}));
       actors[victim].alive = true;
       await sleep(2500);
     } else {
-      setBanner(`❌ ${nameOf(victim)} is the IMPOSTER! They die.`, 3000);
-      setPrompt(`${nameOf(victim)} failed to prove their innocence.`);
+      setBanner(fmt(STR.banner_proved_imposter_npc,{n:nameOf(victim)}), 3000);
+      setPrompt(fmt(STR.prompt_proved_failed_npc,{n:nameOf(victim)}));
       play("shot");
       flash();
       gunKick();
@@ -898,7 +939,7 @@ function buildTableCards(){
       new THREE.MeshStandardMaterial({map:backTex, side:THREE.DoubleSide, roughness:0.7}));
     const grp = new THREE.Group(); grp.add(m);
     const dir = SEATS[i].pos.clone().setY(0).normalize();
-    grp.position.set(dir.x*0.50, tableTopY+0.012, dir.z*0.50);
+    grp.position.set(dir.x*0.66, tableTopY+0.006, dir.z*0.66);
     grp.rotation.set(-Math.PI/2, 0, (rng()-0.5)*0.5);
     grp.userData.home = { p:grp.position.clone(), r:grp.rotation.clone() };
     grp.userData.mesh = m;
@@ -1061,7 +1102,7 @@ async function doVote(){
     const t = npcVote(o);
     glanceAt(o,t);
     await sleep(500+rng()*600);
-    showBubble(o, actors[o].npc.name, nameOf(t), 1500);
+    showBubble(o, npcName(actors[o].npc), nameOf(t), 1500);
     votes[t]=(votes[t]||0)+1;
     updateTallies(votes);
     await sleep(900);
@@ -1171,7 +1212,7 @@ function render(){
       if(p && !p.behind){ if(i>0) p = clampBubblePos(p); b.style.left=p.x+"px"; b.style.top=p.y+"px"; }
     }
     if(i>0 && actors[i] && actors[i].group){
-      const pl = plateEls[i] || mkPlate(i, actors[i].npc.name);
+      const pl = plateEls[i] || mkPlate(i, npcName(actors[i].npc));
      const p = headScreenPos(i, 1.9);
       if(p){ pl.style.left=p.x+"px"; pl.style.top=p.y+"px"; }
     }
@@ -1189,9 +1230,7 @@ function frame(now){
 }
 
 /* ---------------- boot ---------------- */
-$("titleBlurb").textContent = STR.title_blurb;
-$("startBtn").textContent = STR.start;
-$("loadNote").textContent = STR.loading;
+applyStaticStrings();
 $("myCard").style.display="none";
 $("roundTag").textContent="";
 loadWorld().then(()=>{ $("loadNote").textContent=""; });
