@@ -53,8 +53,8 @@ const DPR_CAP = 1.5;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x070503, 0.055);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 60);
-const CAM_BASE = new THREE.Vector3(0, 1.15, 1.9);
-const CAM_LOOK = new THREE.Vector3(0, 1.06, -0.35);
+const CAM_BASE = new THREE.Vector3(0, 1.48, 1.28);
+const CAM_LOOK = new THREE.Vector3(0, 0.86, -0.62);
 camera.position.copy(CAM_BASE);
 
 function resize(){
@@ -62,7 +62,7 @@ function resize(){
   renderer.setPixelRatio(dpr);
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth/innerHeight;
-  camera.fov = innerWidth < innerHeight ? 66 : 52;   // wider on portrait phones
+  camera.fov = innerWidth < innerHeight ? 72 : 58;   // wider on portrait phones
   camera.updateProjectionMatrix();
 }
 addEventListener("resize", resize); addEventListener("orientationchange", resize); resize();
@@ -94,10 +94,10 @@ texLoader.load(assetSrc("bg_tavern","bg_tavern.jpg"), tex=>{
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
 const SEATS = [
-  { pos:new THREE.Vector3(0,0, 1.55),      rotY: Math.PI },
-  { pos:new THREE.Vector3(-1.28,0,-0.18),  rotY: Math.atan2(1.28, 0.18) },
-  { pos:new THREE.Vector3(0,0,-1.42),      rotY: 0 },
-  { pos:new THREE.Vector3(1.28,0,-0.18),   rotY: -Math.atan2(1.28, 0.18) },
+  { pos:new THREE.Vector3(0,0, 1.55),     rotY: Math.PI },
+  { pos:new THREE.Vector3(-1.18,0,-0.42), rotY: Math.atan2(1.18, 0.42) },
+  { pos:new THREE.Vector3(0,0,-1.5),      rotY: 0 },
+  { pos:new THREE.Vector3(1.18,0,-0.42),  rotY: -Math.atan2(1.18, 0.42) },
 ];
 const loader = new GLTFLoader();
 function loadGLB(key, file){ return new Promise(res=>loader.load(assetSrc(key,file), g=>res(g.scene), undefined, ()=>res(null))); }
@@ -157,7 +157,9 @@ async function loadWorld(){
     const a = makeActorShell(i);
     const npc = NPCS[i-1];
     a.npc = npc;
-    a.inner = models[i] ? normalize(models[i], 1.46) : placeholderChar(npc.chip);
+    a.inner = models[i] ? normalize(models[i], 1.5) : placeholderChar(npc.chip);
+    { const cb = new THREE.Box3().setFromObject(a.inner);
+      a.inner.position.y += (tableTopY + 0.62) - cb.max.y; }
     a.group.add(a.inner);
     actors[i] = a;
   }
@@ -482,7 +484,9 @@ async function dealCardsSequence(){
   const mine = cards[0];
   const face = cardFaceTexture(G.imposterSeat===0);
   await sleep(200);
-  await tweenTo(mine, new THREE.Vector3(0.14, 1.0, 1.36), {x:-0.16, y:0, z:0.04}, 650);
+  const holdP = new THREE.Vector3(0.08, 1.26, 0.72);
+  const dummy = new THREE.Object3D(); dummy.position.copy(holdP); dummy.lookAt(CAM_BASE);
+  await tweenTo(mine, holdP, {x:dummy.rotation.x, y:dummy.rotation.y, z:dummy.rotation.z+0.05}, 650);
   mine.userData.mesh.material.map = face; mine.userData.mesh.material.needsUpdate = true;
   setPrompt(STR.tap_to_place);
   await waitTap(8000);
@@ -668,7 +672,7 @@ function render(){
     const b=bubbleEls[i];
     if(b){
       if(+b.dataset.hideAt < clock.t) b.classList.remove("show");
-      let p = i===0 ? {x:innerWidth/2, y:innerHeight*0.72} : headScreenPos(i,1.7);
+      let p = i===0 ? {x:innerWidth/2, y:innerHeight*0.72} : headScreenPos(i,1.92);
       if(p && !p.behind){ if(i>0) p = clampBubblePos(p); b.style.left=p.x+"px"; b.style.top=p.y+"px"; }
     }
     if(i>0 && actors[i] && actors[i].group){
