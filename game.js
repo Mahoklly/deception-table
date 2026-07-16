@@ -159,22 +159,31 @@ async function loadWorld(){
   revolverHome.y = tableTopY + 0.005;
   candle.position.y = tableTopY + 0.26;
 
-  const models = [null, gBrute, gWidow, gFox];
-  for(let i=1;i<4;i++){
-    const a = makeActorShell(i);
-    const npc = NPCS[i-1];
-    a.npc = npc;
-    a.inner = models[i] ? normalize(models[i], 1.5) : placeholderChar(npc.chip);
-    { const cb = new THREE.Box3().setFromObject(a.inner);
-      a.baseY = a.inner.position.y + ((tableTopY + 0.85) - cb.max.y);
-      a.inner.position.y = a.baseY; }
-    { const st = SEATS[i];
-      const ch = makeChair();
-      const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.12);
-      ch.position.copy(st.pos).add(out); ch.rotation.y = st.rotY; scene.add(ch); }
-    a.group.add(a.inner);
-    actors[i] = a;
-  }
+const models = [null, gBrute, gWidow, gFox];
+for(let i=1;i<4;i++){
+  const a = makeActorShell(i);
+  const npc = NPCS[i-1];
+  a.npc = npc;
+  a.inner = models[i] ? normalize(models[i], 1.5) : placeholderChar(npc.chip);
+  
+  // FIX: Position NPC properly above the table
+  const cb = new THREE.Box3().setFromObject(a.inner);
+  const npcHeight = cb.max.y - cb.min.y;
+  a.baseY = tableTopY + 0.65;  // Sit on chair, not under table
+  a.inner.position.y = a.baseY;
+  
+  // Add chair
+  const st = SEATS[i];
+  const ch = makeChair();
+  const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.12);
+  ch.position.copy(st.pos).add(out);
+  ch.position.y = 0;  // Chair sits on floor
+  ch.rotation.y = st.rotY;
+  scene.add(ch);
+  
+  a.group.add(a.inner);
+  actors[i] = a;
+}
   actors[0] = { seat:0, group:null, alive:true, npc:null }; // the player
 
   const gunMesh = gGun ? normalize(gGun, 0.2) :
