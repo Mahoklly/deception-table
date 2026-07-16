@@ -128,6 +128,10 @@ addEventListener("resize", resize); addEventListener("orientationchange", resize
 
 /* lights: one warm candle cutting through cold darkness (style blocks 3-4) */
 scene.add(new THREE.AmbientLight(0x3a4048, 0.9));
+// distance-independent sky/ground wash so the walls read as lit even where
+// the point lights fall off — without this, MeshStandardMaterial walls at
+// the room's edge render as flat black regardless of geometry.
+scene.add(new THREE.HemisphereLight(0x8a7758, 0x1a120a, 2.6));
 const fill = new THREE.PointLight(0x9aa6b8, 0.8, 11, 1.4); fill.position.set(0,1.7,2.3); scene.add(fill);
 const candle = new THREE.PointLight(0xffb457, 3.4, 13, 1.4); candle.position.set(0,1.15,0); scene.add(candle);
 candle.castShadow = true;
@@ -159,9 +163,11 @@ let roomGroup = null;
    generated room_tavern.glb is hooked up (see loadWorld()). */
 function buildRoom(){
   const g = new THREE.Group();
-  const plaster = new THREE.MeshStandardMaterial({color:0x362a1c, roughness:0.95});
-  const trim    = new THREE.MeshStandardMaterial({color:0x1c130a, roughness:0.9});
-  const beamMat = new THREE.MeshStandardMaterial({color:0x18100a, roughness:0.85});
+  // a faint baseline emissive keeps the walls from ever reading as pure black
+  // when they're far from every point light, without faking flat unlit color
+  const plaster = new THREE.MeshStandardMaterial({color:0x4a3a26, roughness:0.95, emissive:0x140d06, emissiveIntensity:0.7});
+  const trim    = new THREE.MeshStandardMaterial({color:0x2a1d10, roughness:0.9, emissive:0x0c0704, emissiveIntensity:0.6});
+  const beamMat = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.85, emissive:0x0a0603, emissiveIntensity:0.6});
   const stone   = new THREE.MeshStandardMaterial({color:0x4a4438, roughness:0.9});
   const log     = new THREE.MeshStandardMaterial({color:0x2a1c10, roughness:0.85});
 
@@ -188,6 +194,19 @@ function buildRoom(){
     beam.position.y = WALL_H - 0.16;
     beam.rotation.y = (Math.PI/6)*i;
     g.add(beam);
+  }
+  // wall-mounted torch sconces: small local point lights so the walls carry
+  // their own warm pools of light instead of relying on falloff from the
+  // table's candle/lantern to reach all the way out to the room's edge
+  for(const ang of [segAngle*1.5, segAngle*3.5, segAngle*6.5, segAngle*8.5]){
+    const wx = Math.sin(ang)*(ROOM_R-0.18), wz = Math.cos(ang)*(ROOM_R-0.18);
+    const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.3,0.1), trim);
+    bracket.position.set(wx, 2.1, wz); bracket.rotation.y = ang; g.add(bracket);
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.09,10,8),
+      new THREE.MeshStandardMaterial({color:0xffb347, emissive:0xff7a1c, emissiveIntensity:2.2, roughness:0.5}));
+    flame.position.set(wx, 2.34, wz); g.add(flame);
+    const torch = new THREE.PointLight(0xff8a3c, 2.0, 7, 1.7);
+    torch.position.set(wx, 2.3, wz); g.add(torch);
   }
   // built-in stone hearth against the back wall, feeding the fireplace point light
   const hearthPos = new THREE.Vector3(1.6, 0, -Math.sqrt(ROOM_R*ROOM_R - 1.6*1.6));
