@@ -1,0 +1,16 @@
+// Asset URL manifest — generated-asset CDN URLs (Higgsfield/CloudFront).
+// Empty string = fall back to a relative ./assets/ file (or procedural placeholder).
+export const ASSET_URLS = {
+  char_brute: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/d134ef7d-8897-429d-ba67-8a2ca0ea9484.glb",
+  char_widow: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/eca7c860-910f-4e08-acc1-b5cfee087784.glb",
+  char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",
+  table_tavern: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/51a49e1d-6b5e-436a-ada2-922cbd143bd5.glb",
+  revolver: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/bafac26e-ea37-4b1d-9c01-eff43afd449c.glb",
+  bg_tavern: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260715_223455_db80a811-a46e-46e1-a516-dcc9010fb17b.png",
+  card_back: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031553_01ad3219-a58e-4b3c-b78f-2167c2d6ebf5.png",
+  music_tavern: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031717_2b35779c-fe86-47c7-929f-2cef3c0678f0.m4a",
+  sfx_gunshot: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031724_70672ab9-88e2-4c91-af7d-c7431b4413a6.mp3",
+  sfx_click: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031730_d923a951-17c8-455d-b254-fc42c6cd9ba0.mp3",
+  sfx_card: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031738_7fc66976-87a9-4128-b64e-8a9e1cda2cd3.mp3",
+  sfx_drum: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031744_0c23782b-8678-47dd-9637-af8a424b5334.mp3",
+};

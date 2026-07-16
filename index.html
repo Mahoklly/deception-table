@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Deception Table</title>
+<style>
+:root{
+  --ink:#0b0906; --umber:#1a130c; --wood:#2a1d10; --paper:#d8c9a3;
+  --oxblood:#7a2e22; --brass:#e08a2e; --brass-glow:#ffb457; --smoke:#22271f;
+  --danger:#c0392b;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--ink);
+  font-family:Georgia,'Times New Roman',serif;color:var(--paper);
+  user-select:none;-webkit-user-select:none}
+canvas#c{display:block;position:fixed;inset:0}
+#dev{position:fixed;top:4px;left:4px;color:#0f0;font:12px monospace;display:none;z-index:99}
+
+/* ---------- overlay layers ---------- */
+.layer{position:fixed;inset:0;pointer-events:none;z-index:5}
+.layer > *{pointer-events:auto}
+
+/* speech bubbles */
+.bubble{position:fixed;transform:translate(-50%,-110%);max-width:44vw;
+  background:rgba(216,201,163,.94);color:#241708;padding:.5em .9em;border-radius:10px;
+  font-size:clamp(15px,2.4vw,21px);font-style:italic;opacity:0;transition:opacity .25s;
+  box-shadow:0 4px 18px rgba(0,0,0,.6);text-align:center;z-index:9}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);
+  border:9px solid transparent;border-top-color:rgba(216,201,163,.94);border-bottom:none}
+.bubble.show{opacity:1}
+.bubble .who{display:block;font-style:normal;font-size:.7em;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--oxblood);margin-bottom:.15em}
+
+/* nameplates under NPCs */
+.plate{position:fixed;transform:translate(-50%,0);font-size:clamp(11px,1.6vw,14px);
+  letter-spacing:.18em;text-transform:uppercase;color:rgba(216,201,163,.75);
+  text-shadow:0 2px 6px #000;z-index:5;transition:opacity .5s}
+.plate.dead{color:rgba(120,60,50,.8);text-decoration:line-through}
+.plate .sus{display:block;text-align:center;font-size:.85em;color:var(--brass);height:1.1em}
+
+/* HUD top */
+#hud{position:fixed;top:max(10px,env(safe-area-inset-top));left:0;right:0;display:flex;
+  justify-content:space-between;align-items:flex-start;padding:0 14px;z-index:7;pointer-events:none}
+#roundTag{background:rgba(11,9,6,.72);border:1px solid rgba(224,138,46,.35);
+  padding:.35em .8em;border-radius:6px;font-size:clamp(12px,1.8vw,15px);letter-spacing:.14em;
+  text-transform:uppercase}
+#myCard{pointer-events:auto;width:clamp(72px,11vw,104px);aspect-ratio:2/3;border-radius:8px;
+  background-size:cover;background-position:center;border:1px solid rgba(224,138,46,.5);
+  box-shadow:0 6px 22px rgba(0,0,0,.7);position:relative;cursor:pointer;
+  transition:transform .18s}
+#myCard:hover{transform:scale(1.04)}
+#myCard .face{position:absolute;inset:0;border-radius:8px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;background:linear-gradient(160deg,#efe3c0,#cbb98d);
+  color:#241708;opacity:0;transition:opacity .2s;padding:4px;text-align:center}
+#myCard.peek .face{opacity:1}
+#myCard .face .lbl{font-size:.55em;letter-spacing:.15em;text-transform:uppercase;opacity:.7}
+#myCard .face .word{font-weight:bold;font-size:clamp(13px,1.9vw,18px);margin-top:.2em}
+#myCard .face .hint{font-size:.62em;margin-top:.45em;color:var(--oxblood)}
+#myCard .face.imposter .word{color:var(--danger)}
+
+/* bottom action tray */
+#tray{position:fixed;left:0;right:0;bottom:max(10px,env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;align-items:center;gap:10px;z-index:7;padding:0 12px}
+#prompt{font-size:clamp(14px,2.2vw,19px);letter-spacing:.06em;color:var(--brass-glow);
+  text-shadow:0 2px 10px #000;min-height:1.3em;text-align:center}
+#hand{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+button{font-family:inherit;cursor:pointer}
+.wordBtn{background:linear-gradient(180deg,#efe3c0,#c9b585);color:#241708;border:none;
+  border-radius:8px;padding:.6em 1.05em;font-size:clamp(14px,2.2vw,18px);font-weight:bold;
+  box-shadow:0 5px 0 #6b5a37,0 8px 18px rgba(0,0,0,.6);transition:transform .08s}
+.wordBtn:active{transform:translateY(4px);box-shadow:0 1px 0 #6b5a37}
+.wordBtn small{display:block;font-weight:normal;font-size:.62em;letter-spacing:.1em;
+  text-transform:uppercase;opacity:.55}
+.ghostBtn{background:rgba(11,9,6,.75);color:var(--brass);border:1px solid rgba(224,138,46,.6);
+  border-radius:8px;padding:.55em 1.2em;font-size:clamp(13px,2vw,16px);letter-spacing:.1em;
+  text-transform:uppercase}
+.ghostBtn:hover{background:rgba(224,138,46,.15)}
+
+/* vote portraits */
+#voteRow{display:none;gap:14px;justify-content:center;flex-wrap:wrap}
+.voteBtn{width:clamp(86px,15vw,120px);background:rgba(26,19,12,.9);
+  border:1px solid rgba(224,138,46,.45);border-radius:10px;color:var(--paper);
+  padding:.6em .4em;display:flex;flex-direction:column;align-items:center;gap:.35em}
+.voteBtn:hover{border-color:var(--brass-glow);background:rgba(56,38,20,.95)}
+.voteBtn .chip{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-weight:bold;font-size:20px;color:#241708}
+.voteBtn .nm{font-size:clamp(11px,1.6vw,13px);letter-spacing:.1em;text-transform:uppercase}
+.voteBtn .tally{font-size:.8em;color:var(--brass)}
+
+/* full-screen panels (title / results) */
+.panel{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:18px;background:radial-gradient(ellipse at 50% 42%,rgba(30,20,10,.55),rgba(5,4,2,.93) 75%);
+  z-index:10;text-align:center;padding:24px;transition:opacity .5s}
+.panel.hidden{opacity:0;pointer-events:none}
+.panel h1{font-size:clamp(30px,7vw,64px);margin:0;letter-spacing:.08em;color:var(--paper);
+  text-shadow:0 0 34px rgba(224,138,46,.35),0 4px 12px #000}
+.panel h1 .accent{color:var(--brass)}
+.panel p{max-width:34em;line-height:1.55;font-size:clamp(14px,2.2vw,18px);color:rgba(216,201,163,.85);margin:.2em 0}
+.panel .big{background:linear-gradient(180deg,#e6952e,#a95f14);color:#1a0f05;border:none;
+  border-radius:10px;padding:.75em 2.2em;font-size:clamp(17px,2.8vw,23px);font-weight:bold;
+  letter-spacing:.08em;box-shadow:0 6px 0 #5e3407,0 10px 26px rgba(0,0,0,.7)}
+.panel .big:active{transform:translateY(5px);box-shadow:0 1px 0 #5e3407}
+#banner{position:fixed;top:26%;left:0;right:0;text-align:center;z-index:9;pointer-events:none;
+  font-size:clamp(22px,5vw,44px);letter-spacing:.12em;color:var(--brass-glow);
+  text-shadow:0 0 30px rgba(224,138,46,.5),0 4px 14px #000;opacity:0;transition:opacity .4s}
+#banner.show{opacity:1}
+#loadNote{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:rgba(216,201,163,.5)}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="dev"></div>
+<div id="flash"></div>
+
+<div class="layer" id="bubbles"></div>
+<div class="layer" id="plates"></div>
+
+<div id="hud">
+  <div id="roundTag"></div>
+  <div id="myCard" title=""><div class="face"><span class="lbl"></span><span class="word"></span><span class="hint"></span></div></div>
+</div>
+
+<div id="banner"></div>
+
+<div id="tray">
+  <div id="prompt"></div>
+  <div id="hand"></div>
+  <div id="voteRow"></div>
+  <div id="actions"></div>
+</div>
+
+<div class="panel" id="title">
+  <h1>THE <span class="accent">DECEPTION</span> TABLE</h1>
+  <p id="titleBlurb"></p>
+  <button class="big" id="startBtn"></button>
+  <div id="loadNote"></div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script type="module" src="./game.js"></script>
+</body>
+</html>
