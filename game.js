@@ -168,9 +168,10 @@ async function loadWorld(){
     { const cb = new THREE.Box3().setFromObject(a.inner);
       a.baseY = a.inner.position.y + ((tableTopY + 0.85) - cb.max.y);
       a.inner.position.y = a.baseY; }
-    { const ch = makeChair();
-      const out = seat.pos.clone().setY(0).normalize().multiplyScalar(0.12);
-      ch.position.copy(seat.pos).add(out); ch.rotation.y = seat.rotY; scene.add(ch); }
+    { const st = SEATS[i];
+      const ch = makeChair();
+      const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.12);
+      ch.position.copy(st.pos).add(out); ch.rotation.y = st.rotY; scene.add(ch); }
     a.group.add(a.inner);
     actors[i] = a;
   }
