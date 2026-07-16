@@ -6,7 +6,7 @@ export const ASSET_URLS = {
   char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",
   table_tavern: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/51a49e1d-6b5e-436a-ada2-922cbd143bd5.glb",
   revolver: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/bafac26e-ea37-4b1d-9c01-eff43afd449c.glb",
-  bg_tavern: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260715_223455_db80a811-a46e-46e1-a516-dcc9010fb17b.png",
+  bg_tavern: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_091852_4394d2cb-2453-4063-8da4-ccc0bfe5c77c.png",
   card_back: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031553_01ad3219-a58e-4b3c-b78f-2167c2d6ebf5.png",
   music_tavern: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031717_2b35779c-fe86-47c7-929f-2cef3c0678f0.m4a",
   sfx_gunshot: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031724_70672ab9-88e2-4c91-af7d-c7431b4413a6.mp3",
