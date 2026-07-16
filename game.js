@@ -882,7 +882,7 @@ function render(){
     }
     if(i>0 && actors[i] && actors[i].group){
       const pl = plateEls[i] || mkPlate(i, actors[i].npc.name);
-      const p = headScreenPos(i, 2.2);
+      const p = headScreenPos(i, 1.7);
       if(p){ pl.style.left=p.x+"px"; pl.style.top=p.y+"px"; }
     }
   }
