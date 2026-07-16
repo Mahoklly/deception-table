@@ -53,7 +53,7 @@ const DPR_CAP = 1.5;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x070503, 0.055);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 60);
-const CAM_BASE = new THREE.Vector3(0, 1.48, 1.28);
+const CAM_BASE = new THREE.Vector3(0, 1.0, 1.6);
 const CAM_LOOK = new THREE.Vector3(0, 0.9, -0.6);
 let camYaw=0, camPitch=0, camYawT=0, camPitchT=0;
 addEventListener("pointermove", e=>{
