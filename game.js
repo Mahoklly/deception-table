@@ -134,7 +134,7 @@ const rim = new THREE.DirectionalLight(0x24343e, 0.7); rim.position.set(-3,2.5,-
 
 /* floor + backdrop */
 const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 40),
-  new THREE.MeshStandardMaterial({color:0x120c07, roughness:0.95}));
+  new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9}));
 floor.rotation.x = -Math.PI/2; scene.add(floor);
 const texLoader = new THREE.TextureLoader();
 let backdrop = null;
@@ -147,7 +147,34 @@ texLoader.load(assetSrc("bg_tavern","bg_tavern.jpg"), tex=>{
   backdrop.material.color = new THREE.Color(0.95,0.92,0.88);
   scene.add(backdrop);
 }, undefined, ()=>{ /* missing backdrop: fog + darkness carries the mood */ });
-
+/* ---- 3D midground props: real parallax between table and backdrop ---- */
+{
+  const wood = new THREE.MeshStandardMaterial({color:0x4a2f18, roughness:0.85});
+  const dark = new THREE.MeshStandardMaterial({color:0x2e1c0d, roughness:0.9});
+  const iron = new THREE.MeshStandardMaterial({color:0x3a3a3e, roughness:0.6, metalness:0.5});
+  const barrel = (x,z,s=1)=>{
+    const g = new THREE.Group();
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.32*s,0.28*s,0.78*s,14), wood);
+    b.position.y = 0.39*s; g.add(b);
+    for(const hy of [0.18,0.6]){
+      const r = new THREE.Mesh(new THREE.TorusGeometry(0.315*s,0.02,6,18), iron);
+      r.rotation.x = Math.PI/2; r.position.y = hy*s; g.add(r);
+    }
+    g.position.set(x,0,z); g.rotation.y = Math.random()*6.28; scene.add(g);
+  };
+  const crate = (x,z,s=1)=>{
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.62*s,0.62*s,0.62*s), dark);
+    c.position.set(x,0.31*s,z); c.rotation.y = Math.random()*1.2; scene.add(c);
+  };
+  // clusters behind/beside the NPCs, between table (r≈1) and backdrop (r=6.5)
+  barrel(-3.4,-2.6,1.15); barrel(-2.8,-3.2); barrel(-3.7,-1.9,0.8);
+  crate(-4.3, 0.5, 1.0);  crate(-3.9,-0.3, 0.85);
+  barrel( 3.2,-3.0,0.95); crate( 3.4,-2.2, 1.1); crate( 3.9,-1.3, 0.9);
+  barrel( 4.3, 0.4);
+  // warm glow spilling from the painted hearth onto the real floor
+  const ember = new THREE.PointLight(0xff7a3c, 1.4, 8, 1.7);
+  ember.position.set(1.6, 0.6, -4.4); scene.add(ember);
+}
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
 const SEATS = [
