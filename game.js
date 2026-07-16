@@ -53,8 +53,8 @@ const DPR_CAP = 1.5;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x070503, 0.055);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 60);
-const CAM_BASE = new THREE.Vector3(0, 1.5, 1.6);
-const CAM_LOOK = new THREE.Vector3(0, 0.9, -0.6);
+const CAM_BASE = new THREE.Vector3(0, 1.5, 1.3);
+const CAM_LOOK = new THREE.Vector3(0, 1.0, -0.55);
 let camYaw=0, camPitch=0, camYawT=0, camPitchT=0;
 addEventListener("pointermove", e=>{
   if(e.pointerType && e.pointerType!=="mouse") return;
@@ -164,18 +164,14 @@ for(let i=1;i<4;i++){
   const a = makeActorShell(i);
   const npc = NPCS[i-1];
   a.npc = npc;
-  a.inner = models[i] ? normalize(models[i], 1.5) : placeholderChar(npc.chip);
-  
-  // FIX: Position NPC properly above the table
-  const cb = new THREE.Box3().setFromObject(a.inner);
-  const npcHeight = cb.max.y - cb.min.y;
-  a.baseY = tableTopY + 0.45;// Sit on chair, not under table
-  a.inner.position.y = a.baseY;
+  a.inner = models[i] ? normalize(models[i], tableTopY + 0.82) : placeholderChar(npc.chip);
+  // grounded on the floor by normalize; remember that offset for the idle anim
+  a.baseY = a.inner.position.y;
   
   // Add chair
   const st = SEATS[i];
 const ch = makeChair();
-const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.12);
+const out = st.pos.clone().setY(0).normalize().multiplyScalar(0.34);
 ch.position.copy(st.pos).add(out);
 ch.position.y = 0;
 ch.rotation.y = st.rotY;
@@ -433,8 +429,8 @@ async function executeSeat(victim){
 /* ---------------- chairs ---------------- */
 function makeChair(){
   const g = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({color:0x4a2f1b, roughness:0.85});
-  const dark = new THREE.MeshStandardMaterial({color:0x33200f, roughness:0.9});
+  const wood = new THREE.MeshStandardMaterial({color:0x301e0f, roughness:0.9});
+  const dark = new THREE.MeshStandardMaterial({color:0x211307, roughness:0.95});
   const seat = new THREE.Mesh(new THREE.BoxGeometry(0.54,0.06,0.52), wood);
   seat.position.y = 0.5; g.add(seat);
   for(const [lx,lz] of [[-0.23,-0.21],[0.23,-0.21],[-0.23,0.21],[0.23,0.21]]){
