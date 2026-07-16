@@ -54,7 +54,14 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x070503, 0.055);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 60);
 const CAM_BASE = new THREE.Vector3(0, 1.48, 1.28);
-const CAM_LOOK = new THREE.Vector3(0, 0.86, -0.62);
+const CAM_LOOK = new THREE.Vector3(0, 0.9, -0.6);
+let camYaw=0, camPitch=0, camYawT=0, camPitchT=0;
+addEventListener("pointermove", e=>{
+  if(e.pointerType && e.pointerType!=="mouse") return;
+  camYawT   = -((e.clientX/innerWidth)-0.5)*2*0.6;
+  camPitchT = -((e.clientY/innerHeight)-0.5)*2*0.3;
+});
+const _camDir = new THREE.Vector3(), _camTgt = new THREE.Vector3(), _Y = new THREE.Vector3(0,1,0);
 camera.position.copy(CAM_BASE);
 
 function resize(){
@@ -159,7 +166,11 @@ async function loadWorld(){
     a.npc = npc;
     a.inner = models[i] ? normalize(models[i], 1.5) : placeholderChar(npc.chip);
     { const cb = new THREE.Box3().setFromObject(a.inner);
-      a.inner.position.y += (tableTopY + 0.62) - cb.max.y; }
+      a.baseY = a.inner.position.y + ((tableTopY + 0.85) - cb.max.y);
+      a.inner.position.y = a.baseY; }
+    { const ch = makeChair();
+      const out = seat.pos.clone().setY(0).normalize().multiplyScalar(0.12);
+      ch.position.copy(seat.pos).add(out); ch.rotation.y = seat.rotY; scene.add(ch); }
     a.group.add(a.inner);
     actors[i] = a;
   }
@@ -409,6 +420,24 @@ async function executeSeat(victim){
   revolver.rotation.set(0,rng()*6.28,0);
 }
 
+/* ---------------- chairs ---------------- */
+function makeChair(){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({color:0x4a2f1b, roughness:0.85});
+  const dark = new THREE.MeshStandardMaterial({color:0x33200f, roughness:0.9});
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.54,0.06,0.52), wood);
+  seat.position.y = 0.5; g.add(seat);
+  for(const [lx,lz] of [[-0.23,-0.21],[0.23,-0.21],[-0.23,0.21],[0.23,0.21]]){
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.038,0.5,8), dark);
+    leg.position.set(lx,0.25,lz); g.add(leg);
+  }
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.54,0.66,0.06), wood);
+  back.position.set(0,0.88,-0.27); g.add(back);
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.54,0.08,0.07), dark);
+  rail.position.set(0,1.18,-0.27); g.add(rail);
+  return g;
+}
+
 /* ---------------- physical cards on the table ---------------- */
 function cardFaceTexture(isImp){
   const cv=document.createElement("canvas"); cv.width=256; cv.height=384;
@@ -653,17 +682,19 @@ function update(dt){
     const g = a.glance>0 ? Math.sin(Math.min(1,a.glance)*Math.PI)*a.glanceDir*0.55 : 0;
     a.inner.rotation.x = a._leanCur + a.slump*1.15 + breatheAmt*0.4;
     a.inner.rotation.y = g;
-    a.inner.position.y = -a.slump*0.35;
+    a.inner.position.y = (a.baseY||0) - a.slump*0.35;
     a.inner.scale.y = a.inner.scale.x * (1+breatheAmt); // uses normalize's uniform scale as base
   }
   // candle flicker
-  candle.intensity = 2.4 + Math.sin(clock.t*0.011)*0.25 + Math.sin(clock.t*0.037)*0.18;
-  // camera idle sway
-  camera.position.set(
-    CAM_BASE.x + Math.sin(clock.t*0.00042)*0.045,
-    CAM_BASE.y + Math.sin(clock.t*0.00061)*0.03,
-    CAM_BASE.z);
-  camera.lookAt(CAM_LOOK);
+  candle.intensity = 3.4 + Math.sin(clock.t*0.011)*0.3 + Math.sin(clock.t*0.037)*0.2;
+  // fixed camera with smooth mouse-look
+  camYaw += (camYawT - camYaw)*0.07;
+  camPitch += (camPitchT - camPitch)*0.07;
+  camera.position.copy(CAM_BASE);
+  _camDir.copy(CAM_LOOK).sub(CAM_BASE).applyAxisAngle(_Y, camYaw);
+  _camDir.y += camPitch * 1.1;
+  _camTgt.copy(CAM_BASE).add(_camDir);
+  camera.lookAt(_camTgt);
 }
 function render(){
   renderer.render(scene, camera);
@@ -672,12 +703,12 @@ function render(){
     const b=bubbleEls[i];
     if(b){
       if(+b.dataset.hideAt < clock.t) b.classList.remove("show");
-      let p = i===0 ? {x:innerWidth/2, y:innerHeight*0.72} : headScreenPos(i,1.92);
+      let p = i===0 ? {x:innerWidth/2, y:innerHeight*0.72} : headScreenPos(i,2.05);
       if(p && !p.behind){ if(i>0) p = clampBubblePos(p); b.style.left=p.x+"px"; b.style.top=p.y+"px"; }
     }
     if(i>0 && actors[i] && actors[i].group){
       const pl = plateEls[i] || mkPlate(i, actors[i].npc.name);
-      const p = headScreenPos(i, 1.86);
+      const p = headScreenPos(i, 2.2);
       if(p){ pl.style.left=p.x+"px"; pl.style.top=p.y+"px"; }
     }
   }
