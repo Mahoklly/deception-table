@@ -881,10 +881,11 @@ function render(){
       if(p && !p.behind){ if(i>0) p = clampBubblePos(p); b.style.left=p.x+"px"; b.style.top=p.y+"px"; }
     }
     if(i>0 && actors[i] && actors[i].group){
-  const pl = plateEls[i] || mkPlate(i, actors[i].npc.name);
-  const p = headScreenPos(i, 2.2);
-  if(p){ pl.style.left=p.x+"px"; pl.style.top=p.y+"px"; }
-}
+      const pl = plateEls[i] || mkPlate(i, actors[i].npc.name);
+      const p = headScreenPos(i, 1);
+      if(p){ pl.style.left=p.x+"px"; pl.style.top=p.y+"px"; }
+    }
+  }
   const bn=$("banner"); if(bn.dataset.hideAt && +bn.dataset.hideAt<clock.t) bn.classList.remove("show");
 }
 function frame(now){
