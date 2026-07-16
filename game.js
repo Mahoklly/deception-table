@@ -418,12 +418,130 @@ async function executeSeat(victim){
   for(let t=0;t<=1;t+=0.05){ revolver.position.lerpVectors(start,up,t); await sleep(16); }
   revolver.lookAt(target);
   await sleep(900);
-  play("shot"); flash();
-  if(victim!==0){ actors[victim].alive=false; }
-  await sleep(300);
-  // settle back
+  
+  // ----- NEW: PROVE INNOCENCE BY TYPING -----
+  const isPlayer = victim === 0;
+  const secretWord = G.card.secret;
+  let attempts = 0;
+  const maxAttempts = 2;
+  let provedInnocent = false;
+  
+  if (isPlayer) {
+    // Player was voted out — they must type the secret word
+    setPrompt("Type the secret word to prove you're innocent:");
+    
+    // Create input field
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "wordInput";
+    input.placeholder = "Type the secret word...";
+    input.style.cssText = "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding:12px 20px; font-size:24px; border:2px solid #7a2e22; border-radius:8px; background:#1a100a; color:#efe3c0; text-align:center; z-index:100; width:300px;";
+    
+    const confirmBtn = document.createElement("button");
+    confirmBtn.textContent = "Confirm";
+    confirmBtn.style.cssText = "position:absolute; top:calc(50% + 60px); left:50%; transform:translateX(-50%); padding:10px 40px; font-size:20px; background:#7a2e22; color:#efe3c0; border:none; border-radius:8px; cursor:pointer; z-index:100;";
+    
+    document.body.appendChild(input);
+    document.body.appendChild(confirmBtn);
+    input.focus();
+    
+    const checkWord = () => {
+      const typed = input.value.trim().toLowerCase();
+      const correct = secretWord.toLowerCase();
+      const isClose = (a, b) => {
+        // Simple fuzzy match: check if typed contains correct or vice versa
+        if (a.includes(b) || b.includes(a)) return true;
+        // Levenshtein-like: check if 80% similar
+        let matches = 0;
+        const maxLen = Math.max(a.length, b.length);
+        for (let i = 0; i < Math.min(a.length, b.length); i++) {
+          if (a[i] === b[i]) matches++;
+        }
+        return (matches / maxLen) > 0.7;
+      };
+      
+      if (typed === correct || isClose(typed, correct)) {
+        provedInnocent = true;
+        input.remove();
+        confirmBtn.remove();
+        setBanner("✅ Innocent! You survive.", 2000);
+        setPrompt("You proved your innocence!");
+        play("click");
+        // Player survives — keep them alive
+        actors[victim].alive = true;
+        resolveVote("innocent");
+      } else {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          input.remove();
+          confirmBtn.remove();
+          setBanner(`❌ Wrong! The word was "${secretWord}". You die.`, 3000);
+          setPrompt("You failed to prove your innocence.");
+          play("shot");
+          flash();
+          actors[victim].alive = false;
+          resolveVote("guilty");
+        } else {
+          setPrompt(`❌ Wrong! ${maxAttempts - attempts} attempt(s) left. Type the secret word:`);
+          input.value = "";
+          input.focus();
+          play("click");
+        }
+      }
+    };
+    
+    confirmBtn.onclick = checkWord;
+    input.onkeydown = (e) => { if (e.key === "Enter") checkWord(); };
+    
+    // Wait for resolution (the resolveVote function will continue)
+    await new Promise(res => window._resolveVote = res);
+    return;
+  } else {
+    // NPC was voted out — they must type the secret word (simulated)
+    setPrompt(`${nameOf(victim)} must prove their innocence...`);
+    await sleep(1000);
+    
+    const npc = actors[victim];
+    const isImp = victim === G.imposterSeat;
+    let guessedCorrect = false;
+    
+    if (isImp) {
+      // Imposter has a small chance to guess correctly (based on how many crew words they've heard)
+      const chance = Math.min(0.15 + G.heardCrewWords * 0.05, 0.5);
+      if (rng() < chance) {
+        guessedCorrect = true;
+      }
+    } else {
+      // Crew always knows the word
+      guessedCorrect = true;
+    }
+    
+    if (guessedCorrect) {
+      setBanner(`✅ ${nameOf(victim)} is innocent! They survive.`, 2500);
+      setPrompt(`${nameOf(victim)} proved their innocence.`);
+      actors[victim].alive = true;
+      await sleep(2500);
+    } else {
+      setBanner(`❌ ${nameOf(victim)} is the IMPOSTER! They die.`, 3000);
+      setPrompt(`${nameOf(victim)} failed to prove their innocence.`);
+      play("shot");
+      flash();
+      actors[victim].alive = false;
+      await sleep(3000);
+    }
+  }
+  
+  // settle revolver back
   for(let t=0;t<=1;t+=0.05){ revolver.position.lerpVectors(up,start,t); await sleep(16); }
   revolver.rotation.set(0,rng()*6.28,0);
+}
+
+// Helper function to resolve vote
+function resolveVote(result) {
+  if (window._resolveVote) {
+    window._resolveVote();
+    window._resolveVote = null;
+  }
 }
 
 /* ---------------- chairs ---------------- */
