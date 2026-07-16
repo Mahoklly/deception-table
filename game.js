@@ -166,6 +166,24 @@ function applyRepeatTex(material, key, file, rx, ry){
     material.needsUpdate = true;
   }, undefined, ()=>{ /* keep the flat fallback color already on the material */ });
 }
+/* one-shot (non-tiling) version for a single mounted photo — a neon sign,
+   a framed picture — that also glows via emissiveMap instead of tiling. */
+function applyOnceTex(material, key, file){
+  texLoader.load(assetSrc(key, file), tex=>{
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    material.map = tex;
+    material.emissiveMap = tex;
+    material.color.setHex(0xffffff);
+    material.needsUpdate = true;
+  }, undefined, ()=>{ /* keep the flat dark fallback plaque */ });
+}
+// opposite flank from the hearth on the back wall — where the bar station goes
+const BAR_ANGLE = Math.PI + 0.4;
+function wallPoint(ang, inset=0){
+  const r = ROOM_R - inset;
+  return new THREE.Vector3(Math.sin(ang)*r, 0, Math.cos(ang)*r);
+}
 const floorMat = new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9});
 applyRepeatTex(floorMat, "tex_wood_floor","tex_wood_floor.jpg", 6, 6);
 const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_R, 48), floorMat);
@@ -239,6 +257,41 @@ function buildRoom(){
     l.rotation.z = Math.PI/2; l.rotation.y = i*0.5;
     l.position.set(hearthPos.x + (i-1.5)*0.05, 0.1, hearthPos.z + 0.55);
     g.add(l);
+  }
+  // neon "BAR" sign — a real plane mounted flush on the wall, not a scene
+  // backdrop: it only reads from nearby, exactly like a real hung sign would
+  {
+    const signMat = new THREE.MeshStandardMaterial({color:0x0a0705, roughness:0.6, emissive:0x000000});
+    applyOnceTex(signMat, "tex_neon_bar","tex_neon_bar.jpg");
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.1), signMat);
+    const sp = wallPoint(BAR_ANGLE, 0.14);
+    sign.position.set(sp.x, 2.55, sp.z);
+    sign.rotation.y = BAR_ANGLE + Math.PI;
+    g.add(sign);
+  }
+  // warm string lights strung along the ceiling beams — reads as a lived-in
+  // bar rather than a medieval hall; ambient glow only, no shadow casting
+  {
+    const bulbMat = new THREE.MeshStandardMaterial({color:0xffe3a8, emissive:0xffb347, emissiveIntensity:2.5, roughness:0.4});
+    const wireMat = new THREE.MeshBasicMaterial({color:0x151008});
+    const stringLight = (a0, a1, sag)=>{
+      const p0 = new THREE.Vector3(Math.sin(a0)*(ROOM_R-0.3), WALL_H-0.3, Math.cos(a0)*(ROOM_R-0.3));
+      const p1 = new THREE.Vector3(Math.sin(a1)*(ROOM_R-0.3), WALL_H-0.3, Math.cos(a1)*(ROOM_R-0.3));
+      const mid = p0.clone().lerp(p1,0.5); mid.y -= sag;
+      const curve = new THREE.QuadraticBezierCurve3(p0, mid, p1);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.008, 4, false), wireMat));
+      const N = 9;
+      for(let i=1;i<N;i++){
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035,8,8), bulbMat);
+        bulb.position.copy(curve.getPoint(i/N)); bulb.position.y -= 0.03;
+        g.add(bulb);
+      }
+      const soft = new THREE.PointLight(0xffb347, 0.7, 4, 2.0);
+      soft.position.copy(mid); soft.position.y += 0.2;
+      g.add(soft); // no castShadow — ambient fill only
+    };
+    stringLight(segAngle*0.5, segAngle*2.5, 0.55);
+    stringLight(segAngle*5.5, segAngle*7.5, 0.55);
   }
   scene.add(g);
   enableShadow(g);
@@ -322,16 +375,51 @@ let table=null, revolver=null, tableTopY=0.95, worldReady=false, cardBackTex=nul
 const cards=[];
 const revolverHome = new THREE.Vector3(0.28, 0, 0.15);
 async function loadWorld(){
-  const [gRoom, gTable, gBrute, gWidow, gFox, gGun] = await Promise.all([
+  const [gRoom, gTable, gBrute, gWidow, gFox, gGun, gBarShelf] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
     loadGLB("table_tavern","table_tavern.glb"), loadGLB("char_brute","char_brute.glb"),
     loadGLB("char_widow","char_widow.glb"), loadGLB("char_fox","char_fox.glb"), loadGLB("revolver","revolver.glb"),
+    loadGLB("room_bar_shelf","room_bar_shelf.glb"),
   ]);
   // swap the procedural box/beam room for a Higgsfield-generated one, if hooked up
   if(gRoom){
     if(roomGroup) scene.remove(roomGroup);
     scene.add(enableShadow(gRoom));
     roomGroup = gRoom;
+  }
+  // back-bar station on the wall flank opposite the hearth: a shelf of
+  // bottles + mirror (real Higgsfield-generated prop, boxes+bottles if not
+  // hooked up) plus a couple of stools, so the room reads as a real bar
+  {
+    const barShelf = gBarShelf ? normalize(gBarShelf, 1.6) : (()=>{
+      const g = new THREE.Group();
+      const wood = new THREE.MeshStandardMaterial({color:0x3a2610, roughness:0.8});
+      const mirror = new THREE.MeshStandardMaterial({color:0x223038, roughness:0.15, metalness:0.6});
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(1.8,0.95,0.5), wood);
+      counter.position.y = 0.475; g.add(counter);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,0.06), mirror);
+      back.position.set(0,1.2,-0.2); g.add(back);
+      const bottleColors = [0x2a5a3a,0x7a2e22,0x1c3a4a,0xc7a23a];
+      for(let row=0; row<2; row++) for(let i=0;i<6;i++){
+        const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.045,0.22,8),
+          new THREE.MeshStandardMaterial({color:bottleColors[i%4], roughness:0.25, metalness:0.05, transparent:true, opacity:0.9}));
+        bottle.position.set(-0.75+i*0.28, 0.6+row*0.35, -0.15);
+        g.add(bottle);
+      }
+      return g;
+    })();
+    const shelfPos = wallPoint(BAR_ANGLE, 0.35);
+    barShelf.position.x = shelfPos.x; barShelf.position.z = shelfPos.z;
+    barShelf.rotation.y = BAR_ANGLE + Math.PI;
+    enableShadow(barShelf);
+    scene.add(barShelf);
+    for(const off of [-0.5, 0.5]){
+      const stool = makeStool();
+      const sp = wallPoint(BAR_ANGLE + off*0.16, 1.3);
+      stool.position.copy(sp);
+      enableShadow(stool);
+      scene.add(stool);
+    }
   }
   table = gTable ? normalize(gTable, 0.95) :
     (()=>{ const t=new THREE.Group();
@@ -761,6 +849,25 @@ function makeChair(){
   back.position.set(0,0.88,-0.27); g.add(back);
   const rail = new THREE.Mesh(new THREE.BoxGeometry(0.54,0.08,0.07), dark);
   rail.position.set(0,1.18,-0.27); g.add(rail);
+  return g;
+}
+/* a plain wooden bar stool for the back-bar dressing — real geometry, no backrest */
+function makeStool(){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({color:0x3a2818, roughness:0.85});
+  const iron = new THREE.MeshStandardMaterial({color:0x2c2c2e, roughness:0.5, metalness:0.6});
+  const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.19,0.19,0.05,16), wood);
+  seat.position.y = 0.62; g.add(seat);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.6,8), iron);
+  pole.position.y = 0.32; g.add(pole);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16,0.015,6,16), iron);
+  ring.rotation.x = Math.PI/2; ring.position.y = 0.22; g.add(ring);
+  for(const a of [0,2.1,4.2]){
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.35,6), iron);
+    leg.position.set(Math.sin(a)*0.14, 0.05, Math.cos(a)*0.14);
+    leg.rotation.z = Math.sin(a)*0.25; leg.rotation.x = -Math.cos(a)*0.25;
+    g.add(leg);
+  }
   return g;
 }
 

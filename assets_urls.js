@@ -5,6 +5,8 @@ export const ASSET_URLS = {
   tex_wood_wall: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_103011_27a943b9-b7a4-402e-b8b0-99dd865b9455.png",
   tex_wood_floor: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_103029_b07f3569-b1b2-49c6-9294-4a7bceeb8e9a.png",
   tex_stone_hearth: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_103031_f9de3e2d-3745-4d46-acb3-b43d31a8adb8.png",
+  tex_neon_bar: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_105231_b061d7a3-7516-4fe1-9f81-394ab01c2b43.png",
+  room_bar_shelf: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/e58345df-52c6-4bef-bce7-e5af28cb6916.glb",
   char_brute: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/d134ef7d-8897-429d-ba67-8a2ca0ea9484.glb",
   char_widow: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/eca7c860-910f-4e08-acc1-b5cfee087784.glb",
   char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",
