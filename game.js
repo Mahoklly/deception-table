@@ -151,10 +151,25 @@ function enableShadow(obj, cast=true, recv=true){
 
 /* floor: real ground-plane geometry, physically lit and shadow-receiving */
 const ROOM_R = 6.6, WALL_H = 4.3;
-const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_R, 48),
-  new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9}));
-floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
 const texLoader = new THREE.TextureLoader();
+/* Higgsfield-generated seamless material photos, tiled with real UV repeat
+   onto real geometry — not baked into a flat backdrop image. `material`
+   keeps its flat fallback color (and no map) until the photo actually
+   loads, so a slow/broken fetch never leaves the surface unlit black. */
+function applyRepeatTex(material, key, file, rx, ry){
+  texLoader.load(assetSrc(key, file), tex=>{
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(rx, ry);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    material.map = tex;
+    material.color.setHex(0xffffff);
+    material.needsUpdate = true;
+  }, undefined, ()=>{ /* keep the flat fallback color already on the material */ });
+}
+const floorMat = new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9});
+applyRepeatTex(floorMat, "tex_wood_floor","tex_wood_floor.jpg", 6, 6);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_R, 48), floorMat);
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
 let roomGroup = null;
 
 /* ---- true 3D tavern room: walled polygon, beamed ceiling, built-in hearth ----
@@ -163,6 +178,9 @@ let roomGroup = null;
    generated room_tavern.glb is hooked up (see loadWorld()). */
 function buildRoom(){
   const g = new THREE.Group();
+  const SIDES = 10, segAngle = (Math.PI*2)/SIDES;
+  const segW = 2*ROOM_R*Math.tan(segAngle/2)*1.03;
+
   // a faint baseline emissive keeps the walls from ever reading as pure black
   // when they're far from every point light, without faking flat unlit color
   const plaster = new THREE.MeshStandardMaterial({color:0x4a3a26, roughness:0.95, emissive:0x140d06, emissiveIntensity:0.7});
@@ -170,9 +188,9 @@ function buildRoom(){
   const beamMat = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.85, emissive:0x0a0603, emissiveIntensity:0.6});
   const stone   = new THREE.MeshStandardMaterial({color:0x4a4438, roughness:0.9});
   const log     = new THREE.MeshStandardMaterial({color:0x2a1c10, roughness:0.85});
+  applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", segW/2.1, WALL_H/2.1);
+  applyRepeatTex(stone, "tex_stone_hearth","tex_stone_hearth.jpg", 1.4, 1.4);
 
-  const SIDES = 10, segAngle = (Math.PI*2)/SIDES;
-  const segW = 2*ROOM_R*Math.tan(segAngle/2)*1.03;
   for(let i=0;i<SIDES;i++){
     const ang = segAngle*i;
     const wall = new THREE.Mesh(new THREE.BoxGeometry(segW, WALL_H, 0.28), plaster);
