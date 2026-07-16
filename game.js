@@ -442,7 +442,7 @@ for(let i=1;i<4;i++){
   a.inner = models[i] ? normalize(models[i], tableTopY + 0.82) : placeholderChar(npc.chip);
   enableShadow(a.inner);
   // grounded on the floor by normalize; remember that offset for the idle anim
-  a.baseY = a.inner.position.y - 0.05;
+  a.baseY = a.inner.position.y - 0.08;
 
   // Add chair
   const st = SEATS[i];
