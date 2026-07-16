@@ -442,7 +442,7 @@ for(let i=1;i<4;i++){
   a.inner = models[i] ? normalize(models[i], tableTopY + 0.82) : placeholderChar(npc.chip);
   enableShadow(a.inner);
   // grounded on the floor by normalize; remember that offset for the idle anim
-  a.baseY = a.inner.position.y - 0.1;
+  a.baseY = a.inner.position.y - 0.05;
 
   // Add chair
   const st = SEATS[i];
@@ -898,7 +898,7 @@ function buildTableCards(){
       new THREE.MeshStandardMaterial({map:backTex, side:THREE.DoubleSide, roughness:0.7}));
     const grp = new THREE.Group(); grp.add(m);
     const dir = SEATS[i].pos.clone().setY(0).normalize();
-    grp.position.set(dir.x*0.66, tableTopY+0.006, dir.z*0.66);
+    grp.position.set(dir.x*0.50, tableTopY+0.012, dir.z*0.50);
     grp.rotation.set(-Math.PI/2, 0, (rng()-0.5)*0.5);
     grp.userData.home = { p:grp.position.clone(), r:grp.rotation.clone() };
     grp.userData.mesh = m;
