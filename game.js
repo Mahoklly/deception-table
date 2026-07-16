@@ -316,19 +316,7 @@ function newMatch(){
 }
 
 /* ---------- card HUD ---------- */
-function setupCardHUD(){
-  const c=$("myCard");
-  c.style.backgroundImage="url("+assetSrc("card_back","card_back.png")+"), linear-gradient(160deg,#4a2418,#241208)";
-  const face=c.querySelector(".face");
-  const isImp = G.imposterSeat===0;
-  face.classList.toggle("imposter", isImp);
-  face.querySelector(".lbl").textContent = STR.your_card_label;
-  face.querySelector(".word").textContent = isImp ? STR.imposter_card : G.card.secret;
-  face.querySelector(".hint").textContent = isImp ? fmt(STR.imposter_hint,{h:G.card.hint}) : "";
-  c.title = STR.hold_to_peek;
-  const peek=on=>c.classList.toggle("peek",on);
-  c.onpointerdown=()=>peek(true); c.onpointerup=c.onpointerleave=()=>peek(false);
-}
+function setupCardHUD(){ const c=$("myCard"); if(c) c.style.display="none"; }
 
 /* ---------- word AI ---------- */
 function unused(list){ return list.filter(w=>!G.usedWords.has(w)); }
@@ -463,11 +451,12 @@ async function executeSeat(victim){
   play("drum");
   // revolver rises and aims
   const target = victim===0 ? new THREE.Vector3(0,1.25,1.3) : SEATS[victim].pos.clone().setY(1.25);
-  const start = revolver.position.clone();
   const up = new THREE.Vector3(0, revolverHome.y+0.55, 0);
-  for(let t=0;t<=1;t+=0.05){ revolver.position.lerpVectors(start,up,t); await sleep(16); }
-  revolver.lookAt(target);
-  await sleep(900);
+  const aimYaw = Math.atan2(target.x - up.x, target.z - up.z);
+  const aimPitch = -Math.atan2(target.y - up.y, Math.hypot(target.x-up.x, target.z-up.z));
+  await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 1000); // slow level lift
+  await tweenTo(revolver, up, {x:aimPitch, y:aimYaw, z:0}, 700);        // swing onto the target
+  await sleep(900);                                                      // the dramatic pause
   
   // ----- NEW: PROVE INNOCENCE BY TYPING -----
   const isPlayer = victim === 0;
@@ -529,6 +518,7 @@ async function executeSeat(victim){
           setPrompt("You failed to prove your innocence.");
           play("shot");
           flash();
+          gunKick();
           actors[victim].alive = false;
           resolveVote("guilty");
         } else {
@@ -545,7 +535,6 @@ async function executeSeat(victim){
     
     // Wait for resolution (the resolveVote function will continue)
     await new Promise(res => window._resolveVote = res);
-    return;
   } else {
     // NPC was voted out — they must type the secret word (simulated)
     setPrompt(`${nameOf(victim)} must prove their innocence...`);
@@ -576,14 +565,21 @@ async function executeSeat(victim){
       setPrompt(`${nameOf(victim)} failed to prove their innocence.`);
       play("shot");
       flash();
+      gunKick();
       actors[victim].alive = false;
       await sleep(3000);
     }
   }
   
-  // settle revolver back
-  for(let t=0;t<=1;t+=0.05){ revolver.position.lerpVectors(up,start,t); await sleep(16); }
-  revolver.rotation.set(0,rng()*6.28,0);
+  // settle back down to the table, flat
+  await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 450);
+  await tweenTo(revolver, revolverHome, {x:0, y:rng()*6.28, z:0}, 800);
+}
+async function gunKick(){
+  const r0={x:revolver.rotation.x, y:revolver.rotation.y, z:revolver.rotation.z};
+  const p0=revolver.position.clone();
+  await tweenTo(revolver, p0.clone().add(new THREE.Vector3(0,0.07,0)), {x:r0.x-0.4, y:r0.y, z:r0.z}, 70);
+  await tweenTo(revolver, p0, r0, 280);
 }
 
 // Helper function to resolve vote
@@ -666,6 +662,7 @@ function waitTap(maxMs){
 }
 async function dealCardsSequence(){
   while(!worldReady) await sleep(120);
+  cardBusy = true; cardFlipped = false;
   play("card");
   // reset cards to their table spots (back design up)
   for(const c of cards){
@@ -685,19 +682,49 @@ async function dealCardsSequence(){
   });
   // your card comes up to your face
   const mine = cards[0];
-  const face = cardFaceTexture(G.imposterSeat===0);
+  myFaceTex = cardFaceTexture(G.imposterSeat===0);
   await sleep(200);
   const holdP = new THREE.Vector3(0.08, 1.26, 0.72);
   const dummy = new THREE.Object3D(); dummy.position.copy(holdP); dummy.lookAt(CAM_BASE);
   await tweenTo(mine, holdP, {x:dummy.rotation.x, y:dummy.rotation.y, z:dummy.rotation.z+0.05}, 650);
-  mine.userData.mesh.material.map = face; mine.userData.mesh.material.needsUpdate = true;
+  mine.userData.mesh.material.map = myFaceTex; mine.userData.mesh.material.needsUpdate = true;
   setPrompt(STR.tap_to_place);
   await waitTap(8000);
   mine.userData.mesh.material.map = cardBackTex; mine.userData.mesh.material.needsUpdate = true;
   await tweenTo(mine, mine.userData.home.p, mine.userData.home.r, 550);
   await Promise.all(npcPeeks);
   setPrompt("");
+  cardBusy = false;
 }
+
+/* ---- your table card: click it to flip and read, click again to flip back ---- */
+let myFaceTex=null, cardFlipped=false, cardBusy=false;
+async function flipMyCard(){
+  if(cardBusy || !worldReady || !myFaceTex || !cards[0]) return;
+  cardBusy = true;
+  const mine = cards[0], h = mine.userData.home;
+  play("card");
+  if(!cardFlipped){
+    await tweenTo(mine, h.p.clone().add(new THREE.Vector3(0,0.1,0)), {x:-1.05, y:0, z:0}, 240);
+    mine.userData.mesh.material.map = myFaceTex; mine.userData.mesh.material.needsUpdate = true;
+    await tweenTo(mine, h.p.clone().add(new THREE.Vector3(0,0.15,0)), {x:-0.5, y:0, z:0}, 240);
+    cardFlipped = true;
+  } else {
+    await tweenTo(mine, h.p.clone().add(new THREE.Vector3(0,0.1,0)), {x:-1.05, y:0, z:0}, 200);
+    mine.userData.mesh.material.map = cardBackTex; mine.userData.mesh.material.needsUpdate = true;
+    await tweenTo(mine, h.p, h.r, 260);
+    cardFlipped = false;
+  }
+  cardBusy = false;
+}
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
+renderer.domElement.addEventListener("pointerdown", e=>{
+  if(!worldReady || !myFaceTex || !cards[0]) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  _ndc.set(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  _ray.setFromCamera(_ndc, camera);
+  if(_ray.intersectObject(cards[0], true).length) flipMyCard();
+});
 
 /* ---------------- match flow ---------------- */
 async function runMatch(){
@@ -882,7 +909,7 @@ function render(){
     }
     if(i>0 && actors[i] && actors[i].group){
       const pl = plateEls[i] || mkPlate(i, actors[i].npc.name);
-      const p = headScreenPos(i, 1);
+      const p = headScreenPos(i, 0.7);
       if(p){ pl.style.left=p.x+"px"; pl.style.top=p.y+"px"; }
     }
   }
