@@ -237,6 +237,22 @@ scene.add(ch);
   revolver = new THREE.Group(); revolver.add(gunMesh);
   revolver.position.copy(revolverHome); revolver.rotation.y = rng()*6.28;
   scene.add(revolver);
+  // hard-drop the revolver onto the real table surface (measured, not guessed)
+  revolver.updateMatrixWorld(true);
+  {
+    let surfY = tableTopY;
+    if (table) {
+      const rc = new THREE.Raycaster(
+        new THREE.Vector3(revolverHome.x, tableTopY + 2, revolverHome.z),
+        new THREE.Vector3(0, -1, 0)
+      );
+      const hit = rc.intersectObject(table, true)[0];
+      if (hit) surfY = hit.point.y;
+    }
+    const gb = new THREE.Box3().setFromObject(revolver);
+    revolver.position.y += (surfY + 0.004) - gb.min.y;
+    revolverHome.copy(revolver.position);
+  }
   buildTableCards();
   worldReady = true;
 }
@@ -909,7 +925,7 @@ function render(){
     }
     if(i>0 && actors[i] && actors[i].group){
       const pl = plateEls[i] || mkPlate(i, actors[i].npc.name);
-      const p = headScreenPos(i, 0.7);
+     const p = headScreenPos(i, 1.9);
       if(p){ pl.style.left=p.x+"px"; pl.style.top=p.y+"px"; }
     }
   }
