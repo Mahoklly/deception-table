@@ -206,13 +206,19 @@ function applyRepeatTex(material, key, file, rx, ry){
   }, undefined, ()=>{ /* keep the flat fallback color already on the material */ });
 }
 /* one-shot (non-tiling) version for a single mounted photo — a neon sign,
-   a framed picture — that also glows via emissiveMap instead of tiling. */
-function applyOnceTex(material, key, file){
+   a mural, a poster wall — that also self-illuminates via emissiveMap.
+   `glow` scales the self-illumination: ~1 for real neon, ~0.3 for artwork
+   that should merely stay readable in the dim room. The emissive color
+   must be set to white here — a black emissive (the default) multiplies
+   the emissiveMap to zero and the texture never glows at all. */
+function applyOnceTex(material, key, file, glow=1){
   texLoader.load(assetSrc(key, file), tex=>{
     tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
     tex.colorSpace = THREE.SRGBColorSpace;
     material.map = tex;
     material.emissiveMap = tex;
+    material.emissive.setHex(0xffffff);
+    material.emissiveIntensity = glow;
     material.color.setHex(0xffffff);
     material.needsUpdate = true;
   }, undefined, ()=>{ /* keep the flat dark fallback plaque */ });
@@ -369,6 +375,179 @@ scene.add(fireplace);
   barrel( 3.2,-3.0,0.95); crate( 3.4,-2.2, 1.1); crate( 3.9,-1.3, 0.9);
   barrel( 4.3, 0.4);
 }
+
+/* ---- tropical dive-bar dressing: tiki / industrial / street-art layer ----
+   Everything here is procedural geometry (zero generation cost) except two
+   wall artworks (graffiti mural + poster collage) that mount Higgsfield
+   images via applyOnceTex. Existing assets are untouched — this only ADDS
+   set dressing on top of the room, bar station, and textures already built. */
+function buildDiveBar(){
+  const g = new THREE.Group();
+  const SEG = (Math.PI*2)/10;
+  const steel   = new THREE.MeshStandardMaterial({color:0x1c1c20, roughness:0.35, metalness:0.75});
+  const leather = new THREE.MeshStandardMaterial({color:0x4a1e18, roughness:0.55});
+  const wood    = new THREE.MeshStandardMaterial({color:0x3a2412, roughness:0.85});
+  const darkTop = new THREE.MeshStandardMaterial({color:0x17100a, roughness:0.6});
+
+  // mounts a flat artwork plane flush on a wall, with a black steel frame
+  const wallArt = (ang, w, h, y, key, file, glow)=>{
+    const mat = new THREE.MeshStandardMaterial({color:0x2e2a24, roughness:0.9});
+    applyOnceTex(mat, key, file, glow);
+    const p = wallPoint(ang, 0.16);
+    const art = new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat);
+    art.position.set(p.x, y, p.z); art.rotation.y = ang + Math.PI;
+    g.add(art);
+    for(const [fw,fh,fx,fy] of [[w+0.08,0.05,0,h/2+0.02],[w+0.08,0.05,0,-h/2-0.02],[0.05,h,-w/2-0.02,0],[0.05,h,w/2+0.02,0]]){
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(fw,fh,0.04), steel);
+      bar.position.set(fx,fy,0.01);
+      art.add(bar);
+    }
+    return art;
+  };
+  // street-art mural on the right wall, poster/sticker collage on the left
+  wallArt(1.85, 2.6, 2.6, 2.0, "tex_graffiti_mural","tex_graffiti_mural.jpg", 0.35);
+  wallArt(4.78, 1.5, 1.5, 1.85, "tex_posters","tex_posters.jpg", 0.3);
+
+  // black steel columns on the wall joints the torches don't already occupy
+  for(const i of [0.5, 2.5, 4.5, 5.5, 7.5, 9.5]){
+    const p = wallPoint(SEG*i, 0.1);
+    const col = new THREE.Mesh(new THREE.BoxGeometry(0.1, WALL_H, 0.1), steel);
+    col.position.set(p.x, WALL_H/2, p.z); col.rotation.y = SEG*i;
+    g.add(col);
+  }
+
+  // red neon accents around the bar station + low red wash (no shadow cost)
+  const neonMat = new THREE.MeshStandardMaterial({color:0xff5040, emissive:0xff2020, emissiveIntensity:3, roughness:0.4});
+  for(const [inset,y,len] of [[0.18, 1.95, 2.0],[0.18, 0.12, 2.6]]){
+    const p = wallPoint(BAR_ANGLE, inset);
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(len, 0.035, 0.035), neonMat);
+    strip.position.set(p.x, y, p.z); strip.rotation.y = BAR_ANGLE + Math.PI;
+    g.add(strip);
+  }
+  const redWash = new THREE.PointLight(0xff3030, 1.5, 6, 1.8);
+  { const p = wallPoint(BAR_ANGLE, 0.9); redWash.position.set(p.x, 1.7, p.z); }
+  g.add(redWash);
+  // warm backlight strip behind the liquor shelf
+  const backlight = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.03, 0.03),
+    new THREE.MeshStandardMaterial({color:0xffc060, emissive:0xffa040, emissiveIntensity:2.5, roughness:0.4}));
+  { const p = wallPoint(BAR_ANGLE, 0.5); backlight.position.set(p.x, 1.5, p.z); backlight.rotation.y = BAR_ANGLE + Math.PI; }
+  g.add(backlight);
+
+  // long wooden bar counter in front of the shelf (stools sit just outside it)
+  {
+    const p = wallPoint(BAR_ANGLE, 0.95);
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.0, 0.5), wood);
+    counter.position.set(p.x, 0.5, p.z); counter.rotation.y = BAR_ANGLE + Math.PI;
+    g.add(counter);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.05, 0.62), darkTop);
+    top.position.set(p.x, 1.03, p.z); top.rotation.y = BAR_ANGLE + Math.PI;
+    g.add(top);
+  }
+
+  // leather booth + barrel cocktail tables with candles, right wall
+  {
+    const ang = 1.2, p = wallPoint(ang, 0.55);
+    const booth = new THREE.Group();
+    const back = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.1, 0.14), leather);
+    back.position.y = 0.75; booth.add(back);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.16, 0.6), leather);
+    seat.position.set(0, 0.42, 0.3); booth.add(seat);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.34, 0.55), wood);
+    base.position.set(0, 0.17, 0.3); booth.add(base);
+    booth.position.set(p.x, 0, p.z); booth.rotation.y = ang + Math.PI;
+    g.add(booth);
+    const barrelTable = (ang2, inset)=>{
+      const bp = wallPoint(ang2, inset), grp = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.27, 0.85, 14), wood);
+      body.position.y = 0.425; grp.add(body);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.37, 0.04, 16), darkTop);
+      top.position.y = 0.87; grp.add(top);
+      const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.07, 6),
+        new THREE.MeshStandardMaterial({color:0xe8dcc0, roughness:0.8}));
+      candle.position.y = 0.93; grp.add(candle);
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6),
+        new THREE.MeshStandardMaterial({color:0xffcf70, emissive:0xffa030, emissiveIntensity:2.6}));
+      flame.position.y = 0.985; grp.add(flame);
+      grp.position.set(bp.x, 0, bp.z);
+      g.add(grp);
+    };
+    barrelTable(1.12, 1.45); barrelTable(1.42, 1.3);
+  }
+
+  // surfboards leaning on the walls — flattened capsules with a tail fin
+  const surfboard = (ang, color)=>{
+    const p = wallPoint(ang, 0.42);
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 1.55, 6, 12),
+      new THREE.MeshStandardMaterial({color, roughness:0.35}));
+    body.scale.z = 0.16; grp.add(body);
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 8),
+      new THREE.MeshStandardMaterial({color:0x1a1a1c, roughness:0.5}));
+    fin.position.set(0, -0.82, 0.1); fin.rotation.x = 0.7; grp.add(fin);
+    grp.position.set(p.x, 1.06, p.z);
+    grp.rotation.y = ang + Math.PI; grp.rotation.z = 0.13;
+    g.add(grp);
+  };
+  surfboard(4.35, 0x2a8a8a);   // teal, near the bar
+  surfboard(2.5, 0xd8b06a);    // sun-bleached cream, near the hearth
+
+  // potted tropical plants — pot + fanned frond planes
+  const plant = (ang, inset)=>{
+    const p = wallPoint(ang, inset), grp = new THREE.Group();
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 0.26, 10),
+      new THREE.MeshStandardMaterial({color:0x6a3a20, roughness:0.9}));
+    pot.position.y = 0.13; grp.add(pot);
+    const frondMat = new THREE.MeshStandardMaterial({color:0x1e5230, roughness:0.8, side:THREE.DoubleSide});
+    for(let i=0;i<7;i++){
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.95), frondMat);
+      f.position.y = 0.65;
+      f.rotation.y = (Math.PI*2/7)*i;
+      f.rotation.x = -0.5 - Math.random()*0.25;
+      grp.add(f);
+    }
+    grp.position.set(p.x, 0, p.z);
+    g.add(grp);
+  };
+  plant(3.05, 0.75); plant(1.55, 0.8); plant(5.15, 0.75);
+
+  // hanging paper lanterns — emissive globes on cords from the beams
+  for(const [r, ang, y, color] of [
+    [3.2, 0.6, 2.85, 0xff4a3a], [4.2, 2.4, 2.7, 0xffb457],
+    [3.6, 4.0, 2.95, 0xff4a3a], [4.4, 5.6, 2.75, 0xffb457], [2.9, 3.1, 3.05, 0xff7040],
+  ]){
+    const x = Math.sin(ang)*r, z = Math.cos(ang)*r;
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, WALL_H-0.2-y, 4),
+      new THREE.MeshBasicMaterial({color:0x151008}));
+    cord.position.set(x, (WALL_H-0.2+y)/2, z); g.add(cord);
+    const globe = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10),
+      new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:1.6, roughness:0.6}));
+    globe.position.set(x, y, z); g.add(globe);
+  }
+
+  // fishing nets — one LineSegments draw call each, draped high on the walls
+  const net = (ang, w, h, y)=>{
+    const pts = [], cols = 9, rows = 6, dx = w/cols, dy = h/rows;
+    for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
+      const x0 = -w/2+i*dx, y0 = -h/2+j*dy;
+      pts.push(x0,y0,0, x0+dx,y0+dy,0,  x0+dx,y0,0, x0,y0+dy,0);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    const mesh = new THREE.LineSegments(geo,
+      new THREE.LineBasicMaterial({color:0x8a7a5c, transparent:true, opacity:0.75}));
+    const p = wallPoint(ang, 0.2);
+    mesh.position.set(p.x, y, p.z);
+    mesh.rotation.y = ang + Math.PI; mesh.rotation.x = 0.12; // slight drape off the wall
+    g.add(mesh);
+  };
+  net(BAR_ANGLE, 2.2, 1.2, 3.5);  // above the bar station
+  net(1.85, 1.8, 1.0, 3.65);      // above the mural
+
+  scene.add(g);
+  enableShadow(g);
+  return g;
+}
+buildDiveBar();
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
 const SEATS = [
