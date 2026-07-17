@@ -155,6 +155,10 @@ function applyStaticStrings(){
   document.getElementById("settingsModeLabel").textContent = STR.settings_mode_label;
   document.getElementById("modeClassicBtn").textContent = STR.mode_classic;
   document.getElementById("modeFullBtn").textContent = STR.mode_fullhouse;
+  document.getElementById("newGameBtn").textContent = STR.settings_newgame;
+  document.getElementById("quitGameBtn").textContent = STR.settings_quit;
+  document.getElementById("quitTitle").textContent = STR.quit_title;
+  document.getElementById("quitBody").textContent = STR.quit_body;
   if(!worldReady) document.getElementById("loadNote").textContent = STR.loading;
   updateCoinTag();
   if(shopOpen) renderShop();
@@ -206,6 +210,24 @@ function changeMode(m){
 modeClassicBtn.addEventListener("click", ()=>changeMode("classic"));
 modeFullBtn.addEventListener("click", ()=>changeMode("fullhouse"));
 updateModeButtons();
+
+/* ---------------- New Game / Quit (Settings) ---------------- */
+document.getElementById("newGameBtn").addEventListener("click", ()=>{
+  if(!confirm(STR.newgame_confirm)) return;
+  location.reload();
+});
+document.getElementById("quitGameBtn").addEventListener("click", ()=>{
+  if(!confirm(STR.quit_confirm)) return;
+  paused = true;
+  try{ for(const k in SND){ if(SND[k]) SND[k].pause(); } }catch(e){}
+  window.close();
+  // most browsers refuse to let a script close a tab it didn't open itself —
+  // if we're still here a moment later, show a clean goodbye screen instead
+  setTimeout(()=>{
+    document.getElementById("settingsMenu").style.display = "none";
+    document.getElementById("quitScreen").style.display = "flex";
+  }, 150);
+});
 
 addEventListener("pointerdown", unlockAudio, {once:false});
 

@@ -94,6 +94,12 @@ en: {
   mode_fullhouse: "Full House (6)",
   mode_change_note: "Changing this reloads the game",
   buy_clue: "Buy a Clue — {n} chips",
+  settings_newgame: "🔄 New Game",
+  settings_quit: "🚪 Quit Game",
+  newgame_confirm: "Start a new game? Your current match will be abandoned.",
+  quit_confirm: "Quit the game?",
+  quit_title: "Thanks for playing!",
+  quit_body: "The Deception Table — you can close this tab now.",
 },
 ku: {
   title_blurb: "سێیان لەنێوان ئێوەدا نهێنیەکی هاوبەشیان هەیە. یەکێکتان تەنها ئاماژەیەکی هەیە. هەر خولێک وشەیەک بڵێ — بەقەد پێویست شاراوە بۆ پاراستنی نهێنییەکە، بەقەد پێویست ڕوون بۆ سەلماندنی زانینت. پاشان دەنگ بدە. تفەنگەکە پاشماوەکە چارەسەر دەکات.",
@@ -182,6 +188,12 @@ ku: {
   mode_fullhouse: "خشتەی پڕ (٦)",
   mode_change_note: "گۆڕینی ئەمە یاریەکە دووبارە بار دەکاتەوە",
   buy_clue: "ئاماژەیەک بکڕە — {n} چیپ",
+  settings_newgame: "🔄 یاریەکی نوێ",
+  settings_quit: "🚪 وازهێنان لە یاری",
+  newgame_confirm: "یاریەکی نوێ دەست پێ بکەیت؟ یاریە ئێستاکەت وازلێدەهێنرێت.",
+  quit_confirm: "وازلە یاری بهێنیت؟",
+  quit_title: "سوپاس بۆ یاریکردن!",
+  quit_body: "خشتەی درۆ — ئێستا دەتوانیت ئەم تابە دابخەیت.",
 },
 };
 

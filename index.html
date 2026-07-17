@@ -32,7 +32,7 @@ html[data-lang="ku"] .wordBtn, html[data-lang="ku"] .ghostBtn, html[data-lang="k
 html[data-lang="ku"] #roundTag, html[data-lang="ku"] #coinTag, html[data-lang="ku"] #myCard .face .word,
 html[data-lang="ku"] #myCard .face .hint, html[data-lang="ku"] #myCard .face .lbl,
 html[data-lang="ku"] #loadNote, html[data-lang="ku"] #settingsMenu,
-html[data-lang="ku"] #wordInput, html[data-lang="ku"] #shopMenu{direction:rtl}
+html[data-lang="ku"] #wordInput, html[data-lang="ku"] #shopMenu, html[data-lang="ku"] #quitScreen{direction:rtl}
 
 /* ---------- overlay layers ---------- */
 .layer{position:fixed;inset:0;pointer-events:none;z-index:5}
@@ -234,10 +234,25 @@ button{font-family:inherit;cursor:pointer}
       <span id="modeChangeNote" style="color:#8a7050; font-size:11px; display:block; margin-top:4px;"></span>
     </div>
 
+    <div style="margin:24px 0 20px; display:flex; flex-direction:column; gap:10px; border-top:1px solid rgba(224,138,46,.3); padding-top:20px;">
+      <button id="newGameBtn" style="padding:.7em 1em; font-size:15px; background:#2a1d10; color:#e08a2e; border:1px solid #7a2e22; border-radius:8px; cursor:pointer; font-family:Georgia,serif;">
+        🔄 New Game
+      </button>
+      <button id="quitGameBtn" style="padding:.7em 1em; font-size:15px; background:#2a1108; color:#c0392b; border:1px solid #7a2e22; border-radius:8px; cursor:pointer; font-family:Georgia,serif;">
+        🚪 Quit Game
+      </button>
+    </div>
+
     <button id="closeSettingsBtn" style="padding:10px 40px; font-size:18px; background:#7a2e22; color:#efe3c0; border:none; border-radius:8px; cursor:pointer; font-family:Georgia,serif;">
       Close
     </button>
   </div>
+</div>
+
+<!-- Quit screen (shown after Quit Game, in case the browser won't let a script close this tab) -->
+<div id="quitScreen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0b0906; z-index:300; justify-content:center; align-items:center; flex-direction:column; text-align:center; padding:20px;">
+  <h2 id="quitTitle" style="color:#efe3c0; font-family:Georgia,serif; font-size:30px; margin:0 0 10px;">Thanks for playing!</h2>
+  <p id="quitBody" style="color:#c6b184; font-size:16px; max-width:420px;">The Deception Table — you can close this tab now.</p>
 </div>
 
 <!-- Shop Menu -->
