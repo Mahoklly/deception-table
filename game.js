@@ -24,8 +24,9 @@ function pumpWaiters(){ for(let i=waiters.length-1;i>=0;i--){ if(clock.t>=waiter
 /* ---------------- audio ---------------- */
 const SND = {};
 const audioUnlocked = { v:false };
-function loadAudio(id, file, {loop=false, vol=1}={}){
-  const a = new Audio(assetSrc(id==="music"?"music_tavern":id==="shot"?"sfx_gunshot":id==="click"?"sfx_click":id==="card"?"sfx_card":"sfx_drum", file));
+function loadAudio(id, file, {loop=false, vol=1, key}={}){
+  const assetKey = key || (id==="music"?"music_tavern":id==="shot"?"sfx_gunshot":id==="click"?"sfx_click":id==="card"?"sfx_card":"sfx_drum");
+  const a = new Audio(assetSrc(assetKey, file));
   a.crossOrigin="anonymous";
   a.preload="auto";
   a.loop=loop;
@@ -33,13 +34,40 @@ function loadAudio(id, file, {loop=false, vol=1}={}){
   a.addEventListener("error", ()=>{ SND[id]=null; });
   SND[id]=a;
 }
-loadAudio("music","music_tavern.mp3",{loop:true,vol:0.28});
+/* ---------------- radio: swappable background music stations ----
+   "The Usual" is the original track; the other three are empty slots
+   (falls back silently until real mp3 URLs are hooked up in
+   assets_urls.js) reserved for chill roadhouse-bar station music. */
+const RADIO_STATIONS = [
+  { id:"usual",  key:"music_tavern",       file:"music_tavern.mp3" },
+  { id:"dust",   key:"music_radio_dust",   file:"music_radio_dust.mp3" },
+  { id:"porch",  key:"music_radio_porch",  file:"music_radio_porch.mp3" },
+  { id:"static", key:"music_radio_static", file:"music_radio_static.mp3" },
+];
+function currentRadioId(){
+  try{ const s = localStorage.getItem("radio_station"); return RADIO_STATIONS.some(r=>r.id===s) ? s : "usual"; }catch(e){ return "usual"; }
+}
+function radioStation(id){ return RADIO_STATIONS.find(r=>r.id===id) || RADIO_STATIONS[0]; }
+{
+  const st = radioStation(currentRadioId());
+  loadAudio("music", st.file, {loop:true, vol:0.28, key:st.key});
+}
 loadAudio("shot","sfx_gunshot.mp3",{vol:0.9});
 loadAudio("click","sfx_click.mp3",{vol:0.8});
 loadAudio("card","sfx_card.mp3",{vol:0.6});
 loadAudio("drum","sfx_drum.mp3",{vol:0.65});
 function play(id){ const a=SND[id]; if(!a) return; try{ if(!a.loop){a.currentTime=0;} a.play().catch(()=>{});}catch(e){} }
 function unlockAudio(){ if(audioUnlocked.v) return; audioUnlocked.v=true; play("music"); }
+function setRadioStation(id){
+  const st = radioStation(id);
+  try{ localStorage.setItem("radio_station", id); }catch(e){}
+  const wasPlaying = !!(SND.music && !SND.music.paused);
+  const vol = SND.music ? SND.music.volume : 0.28;
+  if(SND.music) SND.music.pause();
+  loadAudio("music", st.file, {loop:true, vol, key:st.key});
+  if(wasPlaying || audioUnlocked.v) play("music");
+  updateRadioButtons();
+}
 
 /* ---------------- input: everything becomes a command object ---------------- */
 const BIND = { Digit1:"w1", Digit2:"w2", Digit3:"w3", Digit4:"w4", KeyV:"vote", Space:"confirm", Enter:"confirm" };
@@ -90,6 +118,20 @@ document.getElementById("settingsBtn").addEventListener("click", toggleSettings)
 
 // Close button
 document.getElementById("closeSettingsBtn").addEventListener("click", toggleSettings);
+
+/* ---------------- Radio station buttons ---------------- */
+const radioBtns = RADIO_STATIONS.map((st,i)=>document.getElementById("radioBtn"+i));
+function updateRadioButtons(){
+  const cur = currentRadioId();
+  RADIO_STATIONS.forEach((st,i)=>{
+    const b = radioBtns[i];
+    const active = st.id===cur;
+    b.style.background = active ? "#7a2e22" : "#2a1d10";
+    b.style.color      = active ? "#efe3c0" : "#c6b184";
+  });
+}
+radioBtns.forEach((b,i)=> b.addEventListener("click", ()=>setRadioStation(RADIO_STATIONS[i].id)));
+updateRadioButtons();
 
 /* ---------------- Shop Menu ---------------- */
 let shopOpen = false;
@@ -150,6 +192,8 @@ function applyStaticStrings(){
   document.getElementById("title").querySelector("h1").innerHTML = STR.game_title_html;
   document.getElementById("settingsTitle").textContent = STR.settings_title;
   document.getElementById("settingsVolumeLabel").textContent = STR.settings_volume_label;
+  document.getElementById("settingsRadioLabel").textContent = STR.settings_radio_label;
+  RADIO_STATIONS.forEach((st,i)=>{ radioBtns[i].textContent = STR["radio_station_"+st.id]; });
   document.getElementById("settingsLanguageLabel").textContent = STR.settings_language_label;
   document.getElementById("closeSettingsBtn").textContent = STR.settings_close;
   document.getElementById("settingsModeLabel").textContent = STR.settings_mode_label;

@@ -100,6 +100,11 @@ en: {
   quit_confirm: "Quit the game?",
   quit_title: "Thanks for playing!",
   quit_body: "The Deception Table — you can close this tab now.",
+  settings_radio_label: "📻 Radio Station",
+  radio_station_usual: "The Usual",
+  radio_station_dust: "Dust & Whiskey",
+  radio_station_porch: "Back Porch Blues",
+  radio_station_static: "Smoke & Static",
 },
 ku: {
   title_blurb: "سێیان لەنێوان ئێوەدا نهێنیەکی هاوبەشیان هەیە. یەکێکتان تەنها ئاماژەیەکی هەیە. هەر خولێک وشەیەک بڵێ — بەقەد پێویست شاراوە بۆ پاراستنی نهێنییەکە، بەقەد پێویست ڕوون بۆ سەلماندنی زانینت. پاشان دەنگ بدە. تفەنگەکە پاشماوەکە چارەسەر دەکات.",
@@ -194,6 +199,11 @@ ku: {
   quit_confirm: "وازلە یاری بهێنیت؟",
   quit_title: "سوپاس بۆ یاریکردن!",
   quit_body: "خشتەی درۆ — ئێستا دەتوانیت ئەم تابە دابخەیت.",
+  settings_radio_label: "📻 کەناڵی ڕادیۆ",
+  radio_station_usual: "کەناڵی ئاسایی",
+  radio_station_dust: "تۆز و ویسکی",
+  radio_station_porch: "بلوزی ئێوارە",
+  radio_station_static: "دووکەڵ و نویز",
 },
 };
 

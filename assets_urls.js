@@ -21,7 +21,10 @@ export const ASSET_URLS = {
   ref_bartender: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070844_a28fc51a-6d58-4488-bc91-35dce5fcd390.png", // reference photo for Meshy image-to-3D
   ref_patron: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070845_af161de6-eafc-44a5-af85-2db7b5cadb77.png", // reference photo for Meshy image-to-3D
   card_back: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031553_01ad3219-a58e-4b3c-b78f-2167c2d6ebf5.png",
-  music_tavern: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031717_2b35779c-fe86-47c7-929f-2cef3c0678f0.m4a",
+  music_tavern: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031717_2b35779c-fe86-47c7-929f-2cef3c0678f0.m4a", // Radio station 1/4: "The Usual"
+  music_radio_dust: "", // Radio station 2/4: "Dust & Whiskey" — drop an mp3 URL here
+  music_radio_porch: "", // Radio station 3/4: "Back Porch Blues" — drop an mp3 URL here
+  music_radio_static: "", // Radio station 4/4: "Smoke & Static" — drop an mp3 URL here
   sfx_gunshot: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031724_70672ab9-88e2-4c91-af7d-c7431b4413a6.mp3",
   sfx_click: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031730_d923a951-17c8-455d-b254-fc42c6cd9ba0.mp3",
   sfx_card: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_031738_7fc66976-87a9-4128-b64e-8a9e1cda2cd3.mp3",
