@@ -1150,8 +1150,8 @@ const G = {
    chip-stack system above the revolver code) and physically win/lose
    chips off each other round by round as seats get shot. At match end
    whatever the player nets at the table — up or down — settles here. */
-let coins = 80;
-try{ coins = parseInt(localStorage.getItem("coins"),10) || 0; }catch(e){}
+let coins = 0;
+try{ coins = parseInt(localStorage.getItem("coins"),80) || 0; }catch(e){}
 function updateCoinTag(){ const t=$("coinTag"); if(t) t.textContent = fmt(STR.coin_tag,{n:coins}); }
 function bankTableResult(){
   const net = chipCounts[0] - STARTING_STAKE;
