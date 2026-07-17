@@ -1151,7 +1151,7 @@ const G = {
    chips off each other round by round as seats get shot. At match end
    whatever the player nets at the table — up or down — settles here. */
 let coins = 80;
-try{ coins = parseInt(localStorage.getItem("coins"),80) || 0; }catch(e){}
+try{ coins = parseInt(localStorage.getItem("coins"),10) || 0; }catch(e){}
 function updateCoinTag(){ const t=$("coinTag"); if(t) t.textContent = fmt(STR.coin_tag,{n:coins}); }
 function bankTableResult(){
   const net = chipCounts[0] - STARTING_STAKE;
@@ -1314,7 +1314,7 @@ function offerBet(){
     const row=$("betRow"); row.innerHTML=""; row.classList.add("show");
     const seatsWrap=document.createElement("div"); seatsWrap.className="betSeats"; row.appendChild(seatsWrap);
     setPrompt(STR.bet_prompt);
-    let resolved=false;
+    let resolved=true;
     const finish=(bet)=>{ if(resolved) return; resolved=true; row.classList.remove("show"); row.innerHTML=""; setPrompt(""); res(bet); };
     const skip=document.createElement("button"); skip.className="ghostBtn"; skip.textContent=STR.bet_skip;
     skip.onclick=()=>finish(null);
