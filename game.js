@@ -787,22 +787,22 @@ function makePokerTable(){
 const SHOP_CATALOG = {
   felt: [
     { id:"classic", name:"Classic Green", price:0,   a:"#256b3c", b:"#1c522e", c:"#0f3a1f", edge:"#0a2814" },
-    { id:"oxblood", name:"Oxblood",        price:80,  a:"#7a2e22", b:"#5c2018", c:"#38130d", edge:"#210b07" },
-    { id:"royal",   name:"Royal Blue",     price:80,  a:"#204d78", b:"#173a5c", c:"#0d2338", edge:"#081627" },
-    { id:"noir",    name:"Charcoal Noir",  price:120, a:"#3a3a3d", b:"#2a2a2c", c:"#161617", edge:"#0a0a0b" },
-    { id:"gold",    name:"Gold Rush",      price:200, a:"#8a7226", b:"#6b5818", c:"#3d3009", edge:"#241c05" },
+    { id:"oxblood", name:"Oxblood",        price:0,  a:"#7a2e22", b:"#5c2018", c:"#38130d", edge:"#210b07" },
+    { id:"royal",   name:"Royal Blue",     price:0,  a:"#204d78", b:"#173a5c", c:"#0d2338", edge:"#081627" },
+    { id:"noir",    name:"Charcoal Noir",  price:0, a:"#3a3a3d", b:"#2a2a2c", c:"#161617", edge:"#0a0a0b" },
+    { id:"gold",    name:"Gold Rush",      price:0, a:"#8a7226", b:"#6b5818", c:"#3d3009", edge:"#241c05" },
   ],
   chips: [
     { id:"classic", name:"Classic",     price:0,   colors:[0xe9e2d0, 0xb9312a, 0x1f4fa0, 0x267a3e, 0x6b2f8a] },
-    { id:"neon",    name:"Neon Nights", price:80,  colors:[0x1affe0, 0xff2fd0, 0x2f6bff, 0xccff33, 0xff8a1f] },
-    { id:"noir",    name:"Noir",        price:80,  colors:[0xe6e6e6, 0xa0a0a0, 0x606060, 0x2c2c2c, 0x0e0e0e] },
-    { id:"gold",    name:"Gold Rush",   price:150, colors:[0xf1e0a8, 0xd4af37, 0xb08d3f, 0x6b5218, 0x2a2416] },
+    { id:"neon",    name:"Neon Nights", price:0,  colors:[0x1affe0, 0xff2fd0, 0x2f6bff, 0xccff33, 0xff8a1f] },
+    { id:"noir",    name:"Noir",        price:0,  colors:[0xe6e6e6, 0xa0a0a0, 0x606060, 0x2c2c2c, 0x0e0e0e] },
+    { id:"gold",    name:"Gold Rush",   price:0, colors:[0xf1e0a8, 0xd4af37, 0xb08d3f, 0x6b5218, 0x2a2416] },
   ],
   trim: [
     { id:"classic", name:"Brass",  price:0,   color:0x9a7a30 },
-    { id:"silver",  name:"Silver", price:60,  color:0xb8bec4 },
-    { id:"copper",  name:"Copper", price:60,  color:0xb5651d },
-    { id:"gold",    name:"Gold",   price:150, color:0xd4af37 },
+    { id:"silver",  name:"Silver", price:0,  color:0xb8bec4 },
+    { id:"copper",  name:"Copper", price:0,  color:0xb5651d },
+    { id:"gold",    name:"Gold",   price:0, color:0xd4af37 },
   ],
 };
 let shopOwned = { felt:["classic"], chips:["classic"], trim:["classic"] };
