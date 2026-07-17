@@ -773,6 +773,110 @@ function makeCardCase(){
   }
   return g;
 }
+/* ---------------- casino chip stacks (one per seat, live on the felt) ----
+   Real-looking poker chips: banded colors every 4 chips like a real casino
+   stack (quick to count at a glance), stacked in columns of 10. Each seat's
+   stack sits beside their card. Chips physically fly across the table from
+   loser to survivors whenever someone is shot — the table itself keeps score. */
+const CHIP_COLORS = [0xe9e2d0, 0xb9312a, 0x1f4fa0, 0x267a3e, 0x6b2f8a]; // white/red/blue/green/purple
+const chipTexCache = {};
+function makeChipTex(hex){
+  if(chipTexCache[hex]) return chipTexCache[hex];
+  const cv=document.createElement("canvas"); cv.width=cv.height=128;
+  const g=cv.getContext("2d");
+  const col = "#"+hex.toString(16).padStart(6,"0");
+  const dark = hex===0xe9e2d0;
+  const trim = dark ? "#3a3226" : "#ece4d2";
+  g.fillStyle=col; g.beginPath(); g.arc(64,64,62,0,Math.PI*2); g.fill();
+  g.save(); g.translate(64,64); g.fillStyle=trim;
+  for(let i=0;i<10;i++){ g.rotate(Math.PI/5); g.fillRect(-4,-61,8,15); }
+  g.restore();
+  g.strokeStyle=trim; g.lineWidth=4; g.beginPath(); g.arc(64,64,40,0,Math.PI*2); g.stroke();
+  g.fillStyle=col; g.beginPath(); g.arc(64,64,36,0,Math.PI*2); g.fill();
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  chipTexCache[hex] = t;
+  return t;
+}
+function makeChip(hex){
+  const face = new THREE.MeshStandardMaterial({map: makeChipTex(hex), roughness:0.35});
+  const side = new THREE.MeshStandardMaterial({color:hex, roughness:0.45});
+  const chip = new THREE.Mesh(new THREE.CylinderGeometry(0.046,0.046,0.013,22,1), [side, face, face]);
+  return chip;
+}
+const STARTING_STAKE = 30;
+const chipCounts = [0,0,0,0];
+const chipStacks = [null,null,null,null];
+function chipSlotBase(seatIdx){
+  const dir = SEATS[seatIdx].pos.clone().setY(0).normalize();
+  const perp = new THREE.Vector3(-dir.z,0,dir.x);
+  return dir.multiplyScalar(0.72).add(perp.multiplyScalar(0.22)).setY(tableTopY+0.006);
+}
+function rebuildChipStack(seatIdx){
+  if(chipStacks[seatIdx]) scene.remove(chipStacks[seatIdx]);
+  const n = chipCounts[seatIdx];
+  const g = new THREE.Group();
+  const base = chipSlotBase(seatIdx);
+  const dir = SEATS[seatIdx].pos.clone().setY(0).normalize();
+  const perp = new THREE.Vector3(-dir.z,0,dir.x);
+  for(let i=0;i<n;i++){
+    const col = Math.floor(i/10), row = i%10;
+    const chip = makeChip(CHIP_COLORS[Math.floor(i/4)%CHIP_COLORS.length]);
+    chip.position.set(
+      base.x + perp.x*col*0.11 + (rng()-0.5)*0.003,
+      base.y + row*0.0135 + 0.0068,
+      base.z + perp.z*col*0.11 + (rng()-0.5)*0.003
+    );
+    chip.rotation.y = rng()*6.28;
+    enableShadow(chip);
+    g.add(chip);
+  }
+  scene.add(g);
+  chipStacks[seatIdx] = g;
+}
+function resetChipStakes(){
+  for(let i=0;i<4;i++){ chipCounts[i]=STARTING_STAKE; rebuildChipStack(i); }
+}
+/* animate `amount` chips flying from one seat's stack to another's, then land */
+async function flyChips(fromSeat, toSeat, amount){
+  if(amount<=0) return;
+  const fromBase = chipSlotBase(fromSeat), toBase = chipSlotBase(toSeat);
+  const flyers=[];
+  for(let k=0;k<amount;k++){
+    const chip = makeChip(CHIP_COLORS[k%CHIP_COLORS.length]);
+    chip.position.copy(fromBase); chip.position.y += 0.02 + k*0.003;
+    scene.add(chip); flyers.push(chip);
+  }
+  const steps=26;
+  for(let s=1;s<=steps;s++){
+    const t=s/steps;
+    for(let k=0;k<flyers.length;k++){
+      const delay=k*0.05;
+      const lt=Math.max(0,Math.min(1,(t-delay)/(1-delay+0.0001)));
+      const e=lt*lt*(3-2*lt);
+      flyers[k].position.lerpVectors(fromBase,toBase,e);
+      flyers[k].position.y += Math.sin(e*Math.PI)*0.16;
+      flyers[k].rotation.x += 0.3;
+    }
+    await sleep(16);
+  }
+  for(const c of flyers) scene.remove(c);
+}
+/* a seat just lost the gun draw — they forfeit half their stake (min 4),
+   split across the survivors and animated flying across the table to them */
+async function loseChipsToTable(seat){
+  const total = chipCounts[seat];
+  const forfeited = Math.min(total, Math.max(4, Math.ceil(total*0.5)));
+  if(forfeited<=0) return;
+  chipCounts[seat] -= forfeited;
+  rebuildChipStack(seat);
+  const survivors = aliveSeats().filter(s=>s!==seat);
+  if(survivors.length===0) return;
+  const each = Math.floor(forfeited/survivors.length);
+  let remainder = forfeited - each*survivors.length;
+  const amounts = survivors.map((_,idx)=> each + (idx<remainder?1:0));
+  await Promise.all(survivors.map((s,idx)=> flyChips(seat, s, amounts[idx])));
+  survivors.forEach((s,idx)=>{ chipCounts[s]+=amounts[idx]; rebuildChipStack(s); });
+}
 /* real-geometry western revolver: barrel, cylinder drum, frame, wood grip,
    hammer and trigger guard — used until a Meshy-generated revolver.glb
    is hooked up */
@@ -975,23 +1079,23 @@ const G = {
   heardCrewWords:0, voteCalled:false, extraRound:false, over:false,
 };
 
-/* ---------------- casino coins: a small meta-reward for actually winning ----
-   Persisted in localStorage so it survives reloads/new matches. Only the
-   two outcomes where the PLAYER wins pay out — win_imp means the imposter
-   (an NPC) won over a crew player, which is a loss for them, not a win. */
-const COIN_AWARDS = { win_crew:10, win_you_imp:20 };
+/* ---------------- casino coins: the player's persistent bank ----
+   Persisted in localStorage so it survives reloads/new matches. Every
+   match all four seats stake STARTING_STAKE chips on the felt (see the
+   chip-stack system above the revolver code) and physically win/lose
+   chips off each other round by round as seats get shot. At match end
+   whatever the player nets at the table — up or down — settles here. */
 let coins = 0;
 try{ coins = parseInt(localStorage.getItem("coins"),10) || 0; }catch(e){}
 function updateCoinTag(){ const t=$("coinTag"); if(t) t.textContent = fmt(STR.coin_tag,{n:coins}); }
-function awardCoins(kind){
-  const n = COIN_AWARDS[kind] || 0;
-  if(n <= 0) return 0;
-  coins += n;
+function bankTableResult(){
+  const net = chipCounts[0] - STARTING_STAKE;
+  coins = Math.max(0, coins + net);
   try{ localStorage.setItem("coins", String(coins)); }catch(e){}
   updateCoinTag();
   const t = $("coinTag");
   if(t){ t.classList.add("bump"); setTimeout(()=>t.classList.remove("bump"), 260); }
-  return n;
+  return net;
 }
 const aliveSeats = ()=> [0,1,2,3].filter(i=>actors[i] && actors[i].alive);
 const npcName = npc => getLang()==="ku" ? npc.name_ku : npc.name;
@@ -1184,7 +1288,7 @@ async function executeSeat(victim){
     document.body.appendChild(confirmBtn);
     input.focus();
     
-    const checkWord = () => {
+    const checkWord = async () => {
       const typed = input.value.trim().toLowerCase();
       const correct = secretWord.toLowerCase();
       const isClose = (a, b) => {
@@ -1220,6 +1324,7 @@ async function executeSeat(victim){
           flash();
           gunKick();
           actors[victim].alive = false;
+          await loseChipsToTable(victim);
           resolveVote("guilty");
         } else {
           setPrompt(fmt(STR.prompt_proved_wrong_retry,{n:maxAttempts-attempts}));
@@ -1267,6 +1372,7 @@ async function executeSeat(victim){
       flash();
       gunKick();
       actors[victim].alive = false;
+      await loseChipsToTable(victim);
       await sleep(3000);
     }
   }
@@ -1382,6 +1488,7 @@ function waitTap(maxMs){
 }
 async function dealCardsSequence(){
   while(!worldReady) await sleep(120);
+  resetChipStakes();
   cardBusy = true; cardFlipped = false;
   play("card");
   // reset cards to their table spots (back design up)
@@ -1567,8 +1674,8 @@ function endMatch(kind){
     lose_imp:[STR.lose_you_imp_title,STR.lose_you_imp_body],
   };
   h.innerHTML=map[kind][0];
-  const earned = awardCoins(kind);
-  p.textContent = fmt(map[kind][1],vars) + (earned ? "  " + fmt(STR.coins_earned,{n:earned}) : "");
+  const net = bankTableResult();
+  p.textContent = fmt(map[kind][1],vars) + (net>0 ? "  "+fmt(STR.coins_earned,{n:net}) : net<0 ? "  "+fmt(STR.coins_lost,{n:-net}) : "");
   $("startBtn").textContent=STR.play_again;
   $("loadNote").textContent="";
   t.classList.remove("hidden");
