@@ -32,7 +32,7 @@ html[data-lang="ku"] .wordBtn, html[data-lang="ku"] .ghostBtn, html[data-lang="k
 html[data-lang="ku"] #roundTag, html[data-lang="ku"] #coinTag, html[data-lang="ku"] #myCard .face .word,
 html[data-lang="ku"] #myCard .face .hint, html[data-lang="ku"] #myCard .face .lbl,
 html[data-lang="ku"] #loadNote, html[data-lang="ku"] #settingsMenu,
-html[data-lang="ku"] #wordInput{direction:rtl}
+html[data-lang="ku"] #wordInput, html[data-lang="ku"] #shopMenu{direction:rtl}
 
 /* ---------- overlay layers ---------- */
 .layer{position:fixed;inset:0;pointer-events:none;z-index:5}
@@ -125,6 +125,23 @@ button{font-family:inherit;cursor:pointer}
 .betBtn .nm{font-size:clamp(10px,1.5vw,12px);letter-spacing:.1em;text-transform:uppercase}
 #betRow .stakeRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 
+/* cosmetics shop */
+.shopCat{margin:18px 0;text-align:left}
+.shopCat h3{color:#c6b184;font-size:14px;margin:0 0 10px;font-weight:normal;
+  letter-spacing:.1em;text-transform:uppercase;font-family:Georgia,serif}
+.shopRow{display:flex;gap:10px;flex-wrap:wrap}
+.shopItem{display:flex;flex-direction:column;align-items:center;gap:5px;background:#2a1d10;
+  border:1px solid #4a3420;border-radius:8px;padding:8px 10px;cursor:pointer;min-width:78px;
+  font-family:Georgia,serif;color:#efe3c0}
+.shopItem:hover{border-color:#a06a2e}
+.shopItem.equipped{border-color:#e08a2e;background:#3a2810}
+.shopItem.locked{opacity:.5}
+.shopSwatch{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+.shopSwatch.multi{background:none;position:relative;overflow:hidden}
+.shopName{font-size:11px;letter-spacing:.03em;text-align:center}
+.shopPrice{font-size:10px;color:#e08a2e}
+.shopPrice.owned{color:#8fae8f}
+
 /* full-screen panels (title / results) */
 .panel{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:18px;background:radial-gradient(ellipse at 50% 42%,rgba(30,20,10,.55),rgba(5,4,2,.93) 75%);
@@ -185,6 +202,10 @@ button{font-family:inherit;cursor:pointer}
 <button id="settingsBtn" style="position:fixed; bottom:20px; right:20px; background:#7a2e22; color:#efe3c0; border:none; border-radius:50%; width:44px; height:44px; font-size:22px; cursor:pointer; z-index:201; opacity:0.6; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
   ⚙️
 </button>
+<!-- Shop bag (opens the cosmetics shop panel below) -->
+<button id="shopBtn" style="position:fixed; bottom:76px; right:20px; background:#7a2e22; color:#efe3c0; border:none; border-radius:50%; width:44px; height:44px; font-size:22px; cursor:pointer; z-index:201; opacity:0.6; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+  🛍️
+</button>
 <!-- Settings Menu -->
 <div id="settingsMenu" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:200; justify-content:center; align-items:center; flex-direction:column;">
   <div style="background:#1a100a; padding:40px 60px; border-radius:16px; border:2px solid #7a2e22; text-align:center; max-width:400px; width:90%;">
@@ -205,6 +226,18 @@ button{font-family:inherit;cursor:pointer}
     </div>
 
     <button id="closeSettingsBtn" style="padding:10px 40px; font-size:18px; background:#7a2e22; color:#efe3c0; border:none; border-radius:8px; cursor:pointer; font-family:Georgia,serif;">
+      Close
+    </button>
+  </div>
+</div>
+
+<!-- Shop Menu -->
+<div id="shopMenu" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:200; justify-content:center; align-items:center; flex-direction:column;">
+  <div style="background:#1a100a; padding:32px 40px; border-radius:16px; border:2px solid #7a2e22; text-align:center; max-width:480px; width:92%; max-height:85vh; overflow-y:auto;">
+    <h2 id="shopTitle" style="color:#efe3c0; font-family:Georgia,serif; font-size:26px; margin:0 0 4px;">🛍️ Shop</h2>
+    <div id="shopBalance" style="color:#e08a2e; font-size:15px; margin-bottom:10px;"></div>
+    <div id="shopBody"></div>
+    <button id="closeShopBtn" style="padding:10px 40px; font-size:18px; background:#7a2e22; color:#efe3c0; border:none; border-radius:8px; cursor:pointer; font-family:Georgia,serif; margin-top:14px;">
       Close
     </button>
   </div>

@@ -91,6 +91,55 @@ document.getElementById("settingsBtn").addEventListener("click", toggleSettings)
 // Close button
 document.getElementById("closeSettingsBtn").addEventListener("click", toggleSettings);
 
+/* ---------------- Shop Menu ---------------- */
+let shopOpen = false;
+const shopEl = document.getElementById("shopMenu");
+function toggleShop(){
+  shopOpen = !shopOpen;
+  shopEl.style.display = shopOpen ? "flex" : "none";
+  if(shopOpen) renderShop();
+}
+document.getElementById("shopBtn").addEventListener("click", toggleShop);
+document.getElementById("closeShopBtn").addEventListener("click", toggleShop);
+function renderShop(){
+  document.getElementById("shopTitle").textContent = STR.shop_title;
+  document.getElementById("shopBalance").textContent = fmt(STR.shop_balance,{n:coins});
+  document.getElementById("closeShopBtn").textContent = STR.shop_close;
+  const body = document.getElementById("shopBody");
+  body.innerHTML = "";
+  const cats = [["felt",STR.shop_cat_felt],["chips",STR.shop_cat_chips],["trim",STR.shop_cat_trim]];
+  for(const [cat,label] of cats){
+    const wrap = document.createElement("div"); wrap.className="shopCat";
+    const h = document.createElement("h3"); h.textContent = label; wrap.appendChild(h);
+    const row = document.createElement("div"); row.className="shopRow";
+    for(const item of SHOP_CATALOG[cat]){
+      const owned = shopOwned[cat].includes(item.id);
+      const equipped = shopEquipped[cat]===item.id;
+      const affordable = owned || coins>=item.price;
+      const b = document.createElement("button");
+      b.className = "shopItem" + (equipped?" equipped":"") + (affordable?"":" locked");
+      const swatch = document.createElement("div"); swatch.className="shopSwatch";
+      if(cat==="chips"){
+        const cs = item.colors.map(c=>"#"+c.toString(16).padStart(6,"0"));
+        const n = cs.length;
+        swatch.style.background = `conic-gradient(${cs.map((c,i)=>c+" "+Math.round(i*100/n)+"% "+Math.round((i+1)*100/n)+"%").join(",")})`;
+      } else if(cat==="trim"){
+        swatch.style.background = "#"+item.color.toString(16).padStart(6,"0");
+      } else {
+        swatch.style.background = item.a;
+      }
+      const nm = document.createElement("div"); nm.className="shopName"; nm.textContent = item.name;
+      const price = document.createElement("div"); price.className="shopPrice"+(owned?" owned":"");
+      price.textContent = equipped ? STR.shop_equipped : owned ? STR.shop_owned : (item.price+" 🪙");
+      b.appendChild(swatch); b.appendChild(nm); b.appendChild(price);
+      b.onclick = ()=> buyOrEquip(cat, item.id);
+      row.appendChild(b);
+    }
+    wrap.appendChild(row);
+    body.appendChild(wrap);
+  }
+}
+
 /* ---------------- language switch (English default, Kurdish Sorani secondary) ---------------- */
 // Re-applies every *static* piece of chrome text that was set once at boot
 // (title screen, settings labels) — dynamic prompts/banners read STR live
@@ -105,6 +154,7 @@ function applyStaticStrings(){
   document.getElementById("closeSettingsBtn").textContent = STR.settings_close;
   if(!worldReady) document.getElementById("loadNote").textContent = STR.loading;
   updateCoinTag();
+  if(shopOpen) renderShop();
 }
 const langEnBtn = document.getElementById("langEnBtn");
 const langKuBtn = document.getElementById("langKuBtn");
@@ -645,7 +695,8 @@ function makeActorShell(seatIdx){
 /* real-geometry poker table: dark wood rim, a canvas-drawn green felt
    inlay, brass rivets around the edge, wrought-iron banded pedestal leg —
    used until/unless a Meshy-generated table_tavern.glb is hooked up */
-function makePokerTableTopTex(){
+function makePokerTableTopTex(felt){
+  felt = felt || {a:"#256b3c", b:"#1c522e", c:"#0f3a1f", edge:"#0a2814"};
   const cv = document.createElement("canvas"); cv.width=1024; cv.height=1024;
   const cx = cv.getContext("2d");
   const C = 512;
@@ -663,13 +714,13 @@ function makePokerTableTopTex(){
   // felt: richer gradient, faint fabric weave, subtle center emblem
   const feltR = 400;
   const grad = cx.createRadialGradient(C,C,20,C,C,feltR);
-  grad.addColorStop(0,"#256b3c"); grad.addColorStop(0.75,"#1c522e"); grad.addColorStop(1,"#0f3a1f");
+  grad.addColorStop(0,felt.a); grad.addColorStop(0.75,felt.b); grad.addColorStop(1,felt.c);
   cx.fillStyle = grad; cx.beginPath(); cx.arc(C,C,feltR,0,Math.PI*2); cx.fill();
   cx.globalAlpha = 0.05;
   cx.strokeStyle = "#000";
   for(let i=-feltR;i<feltR;i+=4){ cx.beginPath(); cx.moveTo(C-feltR,C+i); cx.lineTo(C+feltR,C+i); cx.stroke(); }
   cx.globalAlpha = 1;
-  cx.strokeStyle = "#0a2814"; cx.lineWidth = 14;
+  cx.strokeStyle = felt.edge; cx.lineWidth = 14;
   cx.beginPath(); cx.arc(C,C,feltR,0,Math.PI*2); cx.stroke();
   cx.strokeStyle = "rgba(224,178,110,.55)"; cx.lineWidth = 3;
   cx.beginPath(); cx.arc(C,C,feltR-22,0,Math.PI*2); cx.stroke();
@@ -700,13 +751,13 @@ function makeWoodGrainTex(base, dark){
 }
 function makePokerTable(){
   const t = new THREE.Group();
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,0.09,64),
-    new THREE.MeshStandardMaterial({map: makePokerTableTopTex(), roughness:0.7}));
+  const topMat = new THREE.MeshStandardMaterial({map: makePokerTableTopTex(equippedItem("felt")), roughness:0.7});
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,0.09,64), topMat);
   top.position.y = 0.92; t.add(top);
   const rim = new THREE.Mesh(new THREE.TorusGeometry(1.05,0.038,12,64),
     new THREE.MeshPhysicalMaterial({map: makeWoodGrainTex("#2a190c","#160d05"), roughness:0.32, clearcoat:0.5, clearcoatRoughness:0.3}));
   rim.rotation.x = Math.PI/2; rim.position.y = 0.94; t.add(rim);
-  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.28, metalness:0.85});
+  const brass = new THREE.MeshStandardMaterial({color:equippedItem("trim").color, roughness:0.28, metalness:0.85});
   for(let i=0;i<24;i++){
     const a = (Math.PI*2/24)*i;
     const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.017,10,8), brass);
@@ -724,14 +775,92 @@ function makePokerTable(){
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.165,0.018,8,24), iron);
     band.rotation.x = Math.PI/2; band.position.y = hy; t.add(band);
   }
+  t.userData.topMat = topMat;
+  t.userData.rivetMat = brass;
   return t;
 }
+/* ---------------- cosmetics shop: a pure coin sink ----------------
+   Three cosmetic slots — felt color, chip theme, table-rivet trim — each
+   with a free starter item plus paid alternates. Ownership + equipped
+   choice persist in localStorage; buying/equipping re-renders the live
+   table/chips immediately (no reload needed). */
+const SHOP_CATALOG = {
+  felt: [
+    { id:"classic", name:"Classic Green", price:0,   a:"#256b3c", b:"#1c522e", c:"#0f3a1f", edge:"#0a2814" },
+    { id:"oxblood", name:"Oxblood",        price:80,  a:"#7a2e22", b:"#5c2018", c:"#38130d", edge:"#210b07" },
+    { id:"royal",   name:"Royal Blue",     price:80,  a:"#204d78", b:"#173a5c", c:"#0d2338", edge:"#081627" },
+    { id:"noir",    name:"Charcoal Noir",  price:120, a:"#3a3a3d", b:"#2a2a2c", c:"#161617", edge:"#0a0a0b" },
+    { id:"gold",    name:"Gold Rush",      price:200, a:"#8a7226", b:"#6b5818", c:"#3d3009", edge:"#241c05" },
+  ],
+  chips: [
+    { id:"classic", name:"Classic",     price:0,   colors:[0xe9e2d0, 0xb9312a, 0x1f4fa0, 0x267a3e, 0x6b2f8a] },
+    { id:"neon",    name:"Neon Nights", price:80,  colors:[0x1affe0, 0xff2fd0, 0x2f6bff, 0xccff33, 0xff8a1f] },
+    { id:"noir",    name:"Noir",        price:80,  colors:[0xe6e6e6, 0xa0a0a0, 0x606060, 0x2c2c2c, 0x0e0e0e] },
+    { id:"gold",    name:"Gold Rush",   price:150, colors:[0xf1e0a8, 0xd4af37, 0xb08d3f, 0x6b5218, 0x2a2416] },
+  ],
+  trim: [
+    { id:"classic", name:"Brass",  price:0,   color:0x9a7a30 },
+    { id:"silver",  name:"Silver", price:60,  color:0xb8bec4 },
+    { id:"copper",  name:"Copper", price:60,  color:0xb5651d },
+    { id:"gold",    name:"Gold",   price:150, color:0xd4af37 },
+  ],
+};
+let shopOwned = { felt:["classic"], chips:["classic"], trim:["classic"] };
+let shopEquipped = { felt:"classic", chips:"classic", trim:"classic" };
+try{
+  const o = JSON.parse(localStorage.getItem("shop_owned"));
+  if(o) for(const k in shopOwned) if(Array.isArray(o[k])) shopOwned[k]=o[k];
+  const e = JSON.parse(localStorage.getItem("shop_equipped"));
+  if(e) for(const k in shopEquipped) if(typeof e[k]==="string") shopEquipped[k]=e[k];
+}catch(err){}
+function saveShop(){
+  try{
+    localStorage.setItem("shop_owned", JSON.stringify(shopOwned));
+    localStorage.setItem("shop_equipped", JSON.stringify(shopEquipped));
+  }catch(e){}
+}
+function equippedItem(cat){
+  return SHOP_CATALOG[cat].find(i=>i.id===shopEquipped[cat]) || SHOP_CATALOG[cat][0];
+}
+function applyFeltCosmetic(){
+  if(!table || !table.userData.topMat) return;
+  table.userData.topMat.map = makePokerTableTopTex(equippedItem("felt"));
+  table.userData.topMat.needsUpdate = true;
+}
+function applyTrimCosmetic(){
+  if(!table || !table.userData.rivetMat) return;
+  table.userData.rivetMat.color.setHex(equippedItem("trim").color);
+}
+function applyChipCosmetic(){
+  CHIP_PALETTE = equippedItem("chips").colors;
+  for(let i=0;i<4;i++) if(chipStacks[i]) rebuildChipStack(i);
+}
+function buyOrEquip(cat, id){
+  const item = SHOP_CATALOG[cat].find(i=>i.id===id);
+  if(!item) return;
+  if(shopOwned[cat].includes(id)){
+    shopEquipped[cat] = id;
+  } else {
+    if(coins < item.price) return;
+    coins -= item.price;
+    try{ localStorage.setItem("coins", String(coins)); }catch(e){}
+    updateCoinTag();
+    shopOwned[cat].push(id);
+    shopEquipped[cat] = id;
+  }
+  saveShop();
+  if(cat==="felt") applyFeltCosmetic();
+  if(cat==="trim") applyTrimCosmetic();
+  if(cat==="chips") applyChipCosmetic();
+  renderShop();
+}
+
 /* ---------------- casino chip stacks (one per seat, live on the felt) ----
    Real-looking poker chips: banded colors every 4 chips like a real casino
    stack (quick to count at a glance), stacked in columns of 10. Each seat's
    stack sits beside their card. Chips physically fly across the table from
    loser to survivors whenever someone is shot — the table itself keeps score. */
-const CHIP_COLORS = [0xe9e2d0, 0xb9312a, 0x1f4fa0, 0x267a3e, 0x6b2f8a]; // white/red/blue/green/purple
+let CHIP_PALETTE = equippedItem("chips").colors;
 const chipTexCache = {};
 function makeChipTex(hex){
   if(chipTexCache[hex]) return chipTexCache[hex];
@@ -773,7 +902,7 @@ function rebuildChipStack(seatIdx){
   const perp = new THREE.Vector3(-dir.z,0,dir.x);
   for(let i=0;i<n;i++){
     const col = Math.floor(i/10), row = i%10;
-    const chip = makeChip(CHIP_COLORS[Math.floor(i/4)%CHIP_COLORS.length]);
+    const chip = makeChip(CHIP_PALETTE[Math.floor(i/4)%CHIP_PALETTE.length]);
     chip.position.set(
       base.x + perp.x*col*0.11 + (rng()-0.5)*0.003,
       base.y + row*0.0135 + 0.0068,
@@ -795,7 +924,7 @@ async function flyChips(fromSeat, toSeat, amount){
   const fromBase = chipSlotBase(fromSeat), toBase = chipSlotBase(toSeat);
   const flyers=[];
   for(let k=0;k<amount;k++){
-    const chip = makeChip(CHIP_COLORS[k%CHIP_COLORS.length]);
+    const chip = makeChip(CHIP_PALETTE[k%CHIP_PALETTE.length]);
     chip.position.copy(fromBase); chip.position.y += 0.02 + k*0.003;
     scene.add(chip); flyers.push(chip);
   }
