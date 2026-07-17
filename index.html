@@ -26,7 +26,7 @@ canvas#c{display:block;position:fixed;inset:0}
 html[data-lang="ku"] body{font-family:'Noto Naskh Arabic','Segoe UI',Tahoma,Georgia,serif}
 html[data-lang="ku"] #prompt, html[data-lang="ku"] #banner,
 html[data-lang="ku"] .bubble .txt, html[data-lang="ku"] .bubble .who,
-html[data-lang="ku"] .plate, html[data-lang="ku"] .voteBtn .nm,
+html[data-lang="ku"] .plate, html[data-lang="ku"] .voteBtn .nm, html[data-lang="ku"] .betBtn .nm,
 html[data-lang="ku"] .panel h1, html[data-lang="ku"] .panel p,
 html[data-lang="ku"] .wordBtn, html[data-lang="ku"] .ghostBtn, html[data-lang="ku"] .big,
 html[data-lang="ku"] #roundTag, html[data-lang="ku"] #coinTag, html[data-lang="ku"] #myCard .face .word,
@@ -111,6 +111,20 @@ button{font-family:inherit;cursor:pointer}
 .voteBtn .nm{font-size:clamp(11px,1.6vw,13px);letter-spacing:.1em;text-transform:uppercase}
 .voteBtn .tally{font-size:.8em;color:var(--brass)}
 
+/* bet panel: pick a seat, then a stake, before each vote */
+#betRow{display:none;flex-direction:column;align-items:center;gap:10px}
+#betRow.show{display:flex}
+#betRow .betSeats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.betBtn{width:clamp(78px,13vw,104px);background:rgba(26,19,12,.9);
+  border:1px solid rgba(224,138,46,.45);border-radius:10px;color:var(--paper);
+  padding:.5em .3em;display:flex;flex-direction:column;align-items:center;gap:.3em}
+.betBtn:hover{border-color:var(--brass-glow);background:rgba(56,38,20,.95)}
+.betBtn.picked{border-color:var(--brass-glow);background:rgba(90,58,20,.95)}
+.betBtn .chip{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-weight:bold;font-size:17px;color:#241708}
+.betBtn .nm{font-size:clamp(10px,1.5vw,12px);letter-spacing:.1em;text-transform:uppercase}
+#betRow .stakeRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
 /* full-screen panels (title / results) */
 .panel{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:18px;background:radial-gradient(ellipse at 50% 42%,rgba(30,20,10,.55),rgba(5,4,2,.93) 75%);
@@ -152,6 +166,7 @@ button{font-family:inherit;cursor:pointer}
   <div id="prompt"></div>
   <div id="hand"></div>
   <div id="voteRow"></div>
+  <div id="betRow"></div>
   <div id="actions"></div>
 </div>
 

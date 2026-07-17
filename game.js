@@ -726,53 +726,6 @@ function makePokerTable(){
   }
   return t;
 }
-/* revolver case: a fitted, felt-lined tray sitting on the felt — the
-   revolver rests flat on top of it (never propped up) until it's drawn */
-function makeRevolverCase(){
-  const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.03,0.2),
-    new THREE.MeshStandardMaterial({map: makeWoodGrainTex("#1c1108","#0d0703"), roughness:0.6}));
-  base.position.y = 0.015; g.add(base);
-  const liner = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.016,0.15),
-    new THREE.MeshStandardMaterial({color:0x3a1016, roughness:0.9}));
-  liner.position.y = 0.03+0.008; g.add(liner);
-  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.3, metalness:0.8});
-  for(const [w,h,x,z] of [[0.4,0.012,0,0.098],[0.4,0.012,0,-0.098],[0.012,0.012,0.198,0],[0.012,0.012,-0.198,0]]){
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(w,0.014,h), brass);
-    edge.position.set(x,0.03,z); g.add(edge);
-  }
-  return g;
-}
-/* card case: a wooden deck box with its lid set aside and a loose, slightly
-   fanned stack of face-down cards spilling out — the "there's a deck here"
-   flourish. Built after cardBackTex loads so the stack shares the same
-   card-back photo as the dealt cards. */
-function makeCardCase(){
-  const g = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({map: makeWoodGrainTex("#241708","#120b04"), roughness:0.65});
-  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.3, metalness:0.8});
-  const base = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.03,0.145), wood);
-  base.position.y = 0.015; g.add(base);
-  for(const [x,z] of [[-0.075,0.055],[0.075,0.055],[-0.075,-0.055],[0.075,-0.055]]){
-    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.011,0.007,8), brass);
-    foot.position.set(x,0.004,z); g.add(foot);
-  }
-  const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.022,0.016,0.018), brass);
-  clasp.position.set(0.09,0.03,0); g.add(clasp);
-  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.195,0.014,0.15), wood);
-  lid.position.set(-0.16, 0.007, 0.02); lid.rotation.y = 0.35; g.add(lid);
-  if(cardBackTex){
-    for(let i=0;i<7;i++){
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15,0.22),
-        new THREE.MeshStandardMaterial({map:cardBackTex, side:THREE.DoubleSide, roughness:0.7}));
-      m.rotation.x = -Math.PI/2;
-      m.rotation.z = (rng()-0.5)*0.45;
-      m.position.set((rng()-0.5)*0.025, 0.031+i*0.0035, (rng()-0.5)*0.02);
-      g.add(m);
-    }
-  }
-  return g;
-}
 /* ---------------- casino chip stacks (one per seat, live on the felt) ----
    Real-looking poker chips: banded colors every 4 chips like a real casino
    stack (quick to count at a glance), stacked in columns of 10. Each seat's
@@ -982,14 +935,6 @@ scene.add(ch);
 }
   actors[0] = { seat:0, group:null, alive:true, npc:null }; // the player
 
-  // a felt-lined case for the revolver to rest flat in until it's drawn —
-  // attached to `table` so the raycast below lands on its liner, not the bare felt
-  {
-    const revCase = makeRevolverCase();
-    revCase.position.set(revolverHome.x, tableTopY, revolverHome.z);
-    table.add(revCase);
-    enableShadow(revCase);
-  }
   const gunMesh = gGun ? layFlat(normalize(gGun, 0.2)) : makeRevolverModel();
   revolver = new THREE.Group(); revolver.add(gunMesh);
   enableShadow(revolver);
@@ -1012,15 +957,6 @@ scene.add(ch);
     revolverHome.copy(revolver.position);
   }
   buildTableCards();
-  // deck case with a loose stack of cards, sitting in the empty quadrant
-  // opposite the revolver — purely decorative, needs cardBackTex from
-  // buildTableCards() just above
-  {
-    const cardCase = makeCardCase();
-    cardCase.position.set(-0.3, tableTopY, 0.18);
-    table.add(cardCase);
-    enableShadow(cardCase);
-  }
   worldReady = true;
 }
 
@@ -1194,7 +1130,8 @@ function npcVote(o){
 
 /* ---------- UI: prompt / hand / vote ---------- */
 function setPrompt(t){ $("prompt").textContent=t; }
-function clearTray(){ $("hand").innerHTML=""; $("voteRow").style.display="none"; $("voteRow").innerHTML=""; $("actions").innerHTML=""; }
+function clearTray(){ $("hand").innerHTML=""; $("voteRow").style.display="none"; $("voteRow").innerHTML=""; $("actions").innerHTML="";
+  const br=$("betRow"); br.classList.remove("show"); br.innerHTML=""; }
 function offerHand(hand){
   return new Promise(res=>{
     const done=h=>{ $("hand").innerHTML=""; G._handResolver=null; G._handCancel=null; res(h); };
@@ -1231,6 +1168,71 @@ function offerVote(){
       row.appendChild(b);
     }
   });
+}
+
+/* ---------------- side bets: an extra, optional wager on TOP of the
+   automatic table-chip redistribution — the player predicts which seat
+   dies this round, staking coins from their persistent bank. Fair odds:
+   win pays stake×(seats alive at bet time − 1), a wrong guess or a seat
+   that survives loses the stake outright, and a round where nobody dies
+   (tie / proved innocent) refunds it in full. ---------------- */
+const MIN_STAKE = 5;
+function offerBet(){
+  if(coins < MIN_STAKE) return Promise.resolve(null);
+  const alive = aliveSeats();
+  if(alive.length < 2) return Promise.resolve(null);
+  return new Promise(res=>{
+    const row=$("betRow"); row.innerHTML=""; row.classList.add("show");
+    const seatsWrap=document.createElement("div"); seatsWrap.className="betSeats"; row.appendChild(seatsWrap);
+    setPrompt(STR.bet_prompt);
+    let resolved=false;
+    const finish=(bet)=>{ if(resolved) return; resolved=true; row.classList.remove("show"); row.innerHTML=""; setPrompt(""); res(bet); };
+    const skip=document.createElement("button"); skip.className="ghostBtn"; skip.textContent=STR.bet_skip;
+    skip.onclick=()=>finish(null);
+    for(const s of alive){
+      const b=document.createElement("button"); b.className="betBtn"; b.dataset.seat=s;
+      const nm = nameOf(s);
+      const chipColor = s===0 ? "#e08a2e" : actors[s].npc.chip;
+      b.innerHTML=`<span class="chip" style="background:${chipColor}">${nm[0]}</span><span class="nm">${nm}</span>`;
+      b.onclick=()=>{
+        seatsWrap.querySelectorAll(".betBtn").forEach(x=>x.classList.toggle("picked", x===b));
+        showStakeStep(s);
+      };
+      seatsWrap.appendChild(b);
+    }
+    row.appendChild(skip);
+    function showStakeStep(seat){
+      const old = row.querySelector(".stakeRow"); if(old) old.remove();
+      const stakeWrap=document.createElement("div"); stakeWrap.className="stakeRow";
+      const small = Math.min(coins, Math.max(MIN_STAKE, Math.round(coins*0.1)));
+      const medium = Math.min(coins, Math.max(MIN_STAKE, Math.round(coins*0.25)));
+      const seen = new Set();
+      for(const [amt,lbl] of [[small,STR.bet_stake_small],[medium,STR.bet_stake_medium],[coins,STR.bet_stake_allin]]){
+        if(amt < MIN_STAKE || seen.has(amt)) continue;
+        seen.add(amt);
+        const b=document.createElement("button"); b.className="ghostBtn"; b.textContent=fmt(lbl,{n:amt});
+        b.onclick=()=>finish({seat, amount:amt, aliveCount:alive.length});
+        stakeWrap.appendChild(b);
+      }
+      row.appendChild(stakeWrap);
+    }
+  });
+}
+function resolveBet(bet, victim, died){
+  if(!bet) return;
+  if(!died){ setBanner(STR.bet_push, 1800); return; }
+  if(victim===bet.seat){
+    const profit = bet.amount * (bet.aliveCount - 1);
+    coins += profit;
+    try{ localStorage.setItem("coins", String(coins)); }catch(e){}
+    updateCoinTag();
+    setBanner(fmt(STR.bet_win,{a:profit}), 2000);
+  } else {
+    coins = Math.max(0, coins - bet.amount);
+    try{ localStorage.setItem("coins", String(coins)); }catch(e){}
+    updateCoinTag();
+    setBanner(fmt(STR.bet_lose,{a:bet.amount}), 2000);
+  }
 }
 
 /* ---------- actor animation cues ---------- */
@@ -1611,6 +1613,7 @@ async function runMatch(){
 async function doVote(){
   clearTray();
   $("roundTag").textContent = STR.vote_tag;
+  const bet = await offerBet();
   setPrompt(STR.prompt_vote);
   play("drum");
   const votes = {};
@@ -1640,16 +1643,20 @@ async function doVote(){
     setPrompt(STR.prompt_revote);
     clearTray();
     await sleep(2100);
+    resolveBet(bet, null, false);
     return "tie";
   }
   const victim=top[0];
   clearTray();
   setBanner(victim===0?STR.banner_you_shot:fmt(STR.banner_shot,{n:nameOf(victim)}), 2400);
   await executeSeat(victim);
+  const died = !actors[victim].alive;
   const wasImp = victim===G.imposterSeat;
   setBanner(fmt(wasImp?STR.banner_was_imposter:STR.banner_was_innocent,{n:nameOf(victim)}), 2200);
   if(victim!==0){ const p=plateEls[victim]; if(p) p.classList.add("dead"); }
   await sleep(2300);
+  resolveBet(bet, victim, died);
+  if(bet) await sleep(2000);
   // outcomes
   if(wasImp){ endMatch(victim===0 ? "lose_imp" : "win_crew"); return; }
   if(victim===0){ endMatch("lose_shot"); return; }
