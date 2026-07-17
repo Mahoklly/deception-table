@@ -142,7 +142,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const DPR_CAP = 1.5;
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x120305, 0.058);   // smoky red haze
+scene.fog = new THREE.FogExp2(0x0e0803, 0.062);   // warm, gritty roadhouse haze
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 60);
 const CAM_BASE = new THREE.Vector3(0, 1.5, 1.3);
 const CAM_LOOK = new THREE.Vector3(0, 1.0, -0.55);
@@ -165,14 +165,15 @@ function resize(){
 }
 addEventListener("resize", resize); addEventListener("orientationchange", resize); resize();
 
-/* lights: warm candle at the table, everything else soaked in red — the
-   cyberpunk-bar grade: red ambience everywhere except the green bar glow */
-scene.add(new THREE.AmbientLight(0x40181c, 0.9));
+/* lights: warm candle at the table, the whole room bathed in amber/orange —
+   gritty roadhouse grade: dense strings of warm bulbs do most of the work,
+   one small red neon accent and one blue-violet glow (the tank) break it up */
+scene.add(new THREE.AmbientLight(0x3a2818, 0.85));
 // distance-independent sky/ground wash so the walls read as lit even where
 // the point lights fall off — without this, MeshStandardMaterial walls at
 // the room's edge render as flat black regardless of geometry.
-scene.add(new THREE.HemisphereLight(0x7a2a26, 0x140606, 2.2));
-const fill = new THREE.PointLight(0xff4a4a, 0.5, 11, 1.4); fill.position.set(0,1.7,2.3); scene.add(fill);
+scene.add(new THREE.HemisphereLight(0x8a6a42, 0x140d08, 2.1));
+const fill = new THREE.PointLight(0xffab6a, 0.5, 11, 1.4); fill.position.set(0,1.7,2.3); scene.add(fill);
 const candle = new THREE.PointLight(0xffb457, 3.4, 13, 1.4); candle.position.set(0,1.15,0); scene.add(candle);
 candle.castShadow = true;
 candle.shadow.mapSize.set(1024,1024);
@@ -182,7 +183,7 @@ lantern.position.set(0,3.4,0.4); lantern.target.position.set(0,0.9,-0.4); scene.
 lantern.castShadow = true;
 lantern.shadow.mapSize.set(1024,1024);
 lantern.shadow.camera.near = 0.3; lantern.shadow.camera.far = 14; lantern.shadow.bias = -0.0025;
-const rim = new THREE.DirectionalLight(0x6a1420, 0.6); rim.position.set(-3,2.5,-4); scene.add(rim);
+const rim = new THREE.DirectionalLight(0x3a2414, 0.6); rim.position.set(-3,2.5,-4); scene.add(rim);
 /* generic helper: flag every mesh in a subtree to cast/receive real-time shadows */
 function enableShadow(obj, cast=true, recv=true){
   obj.traverse(m=>{ if(m.isMesh){ m.castShadow = cast; m.receiveShadow = recv; } });
@@ -231,7 +232,7 @@ function wallPoint(ang, inset=0){
   return new THREE.Vector3(Math.sin(ang)*r, 0, Math.cos(ang)*r);
 }
 const floorMat = new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9});
-applyRepeatTex(floorMat, "tex_wood_floor","tex_wood_floor.jpg", 6, 6, 0x9a6058);
+applyRepeatTex(floorMat, "tex_wood_floor","tex_wood_floor.jpg", 6, 6, 0xa8875c);
 const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_R, 48), floorMat);
 floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
 let roomGroup = null;
@@ -250,7 +251,7 @@ function buildRoom(){
   const plaster = new THREE.MeshStandardMaterial({color:0x4a3a26, roughness:0.95, emissive:0x140d06, emissiveIntensity:0.7});
   const trim    = new THREE.MeshStandardMaterial({color:0x2a1d10, roughness:0.9, emissive:0x0c0704, emissiveIntensity:0.6});
   const beamMat = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.85, emissive:0x0a0603, emissiveIntensity:0.6});
-  applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", segW/2.1, WALL_H/2.1, 0xb08878);
+  applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", segW/2.1, WALL_H/2.1, 0xc9a876);
 
   for(let i=0;i<SIDES;i++){
     const ang = segAngle*i;
@@ -274,19 +275,21 @@ function buildRoom(){
     beam.rotation.y = (Math.PI/6)*i;
     g.add(beam);
   }
-  // wall sconces: vertical neon bars, pink/red alternating, each feeding a
-  // small colored wash so the walls carry their own pools of colored light
-  let sconceIdx = 0;
+  // small brass wall lamps — dome shade + warm bulb, reclaimed-industrial
+  // touch instead of neon; each throws its own soft amber pool on the wood
   for(const ang of [segAngle*1.5, segAngle*3.5, segAngle*6.5, segAngle*8.5]){
     const wx = Math.sin(ang)*(ROOM_R-0.18), wz = Math.cos(ang)*(ROOM_R-0.18);
     const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.3,0.1), trim);
     bracket.position.set(wx, 2.1, wz); bracket.rotation.y = ang; g.add(bracket);
-    const col = (sconceIdx++ % 2) ? 0xff2020 : 0xff2a6a;
-    const tube = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.62,0.05),
-      new THREE.MeshStandardMaterial({color:col, emissive:col, emissiveIntensity:2, roughness:0.4}));
-    tube.position.set(wx, 2.35, wz); g.add(tube);
-    const wash = new THREE.PointLight(col, 1.5, 6.5, 1.7);
-    wash.position.set(wx, 2.3, wz); g.add(wash);
+    const shade = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.12, 12, 1, true),
+      new THREE.MeshStandardMaterial({color:0x6a4a20, roughness:0.4, metalness:0.6, side:THREE.DoubleSide}));
+    shade.position.set(wx, 2.32, wz); shade.rotation.x = Math.PI; shade.rotation.y = ang;
+    g.add(shade);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05,10,8),
+      new THREE.MeshStandardMaterial({color:0xffcf8a, emissive:0xffa030, emissiveIntensity:2.4}));
+    bulb.position.set(wx, 2.24, wz); g.add(bulb);
+    const wash = new THREE.PointLight(0xffa855, 1.3, 6, 1.8);
+    wash.position.set(wx, 2.2, wz); g.add(wash);
   }
   // neon "BAR" sign — a real plane mounted flush on the wall, above the
   // bar canopy: it only reads from nearby, exactly like a real hung sign
@@ -331,22 +334,21 @@ roomGroup = buildRoom();
   barrel( 4.3, 0.4);
 }
 
-/* ---- cyberpunk dive-bar dressing: red haze, green-neon bar centerpiece ----
+/* ---- gritty roadhouse dive-bar dressing: warm amber, wood, and clutter ----
    Everything here is procedural geometry (zero generation cost); the two
    Higgsfield wall artworks (graffiti mural + poster collage) and the bar
-   shelf/sign assets are reused, just repositioned into the new layout:
-   a green-neon canopy bar dead ahead of the player, framed in a room
-   soaked in red light — pendant lamps, neon wall signage, cocktail
-   tables, red-topped stools. */
-function buildCyberBar(){
+   shelf/sign assets are reused, just repositioned: a warm wooden bar with
+   a backlit shelf dead ahead of the player, a wagon-wheel light fixture
+   overhead, string lights strung everywhere, a dartboard, crossed wood
+   beams, bunting, and a glowing tank on the counter for a cool accent. */
+function buildRoadhouseBar(){
   const g = new THREE.Group();
   const SEG = (Math.PI*2)/10;
-  const steel   = new THREE.MeshStandardMaterial({color:0x1c1c20, roughness:0.35, metalness:0.75});
-  const leather = new THREE.MeshStandardMaterial({color:0x4a1e18, roughness:0.55});
-  const wood    = new THREE.MeshStandardMaterial({color:0x2c1a10, roughness:0.8});
-  const darkTop = new THREE.MeshStandardMaterial({color:0x141014, roughness:0.5, metalness:0.3});
-  const neon = (color, intensity=3.5)=>
-    new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:intensity, roughness:0.4});
+  const steel   = new THREE.MeshStandardMaterial({color:0x201a16, roughness:0.5, metalness:0.55});
+  const leather = new THREE.MeshStandardMaterial({color:0x3a2418, roughness:0.6});
+  const wood    = new THREE.MeshStandardMaterial({color:0x3a2412, roughness:0.85});
+  const darkTop = new THREE.MeshStandardMaterial({color:0x1c140c, roughness:0.6});
+  const brass   = new THREE.MeshStandardMaterial({color:0x8a6a30, roughness:0.35, metalness:0.75});
 
   // mounts a flat artwork plane flush on a wall, with a black steel frame
   const wallArt = (ang, w, h, y, key, file, glow)=>{
@@ -362,11 +364,12 @@ function buildCyberBar(){
       art.add(bar);
     }
   };
-  // street-art mural on the right wall, poster/sticker collage on the left
-  wallArt(1.85, 2.2, 2.2, 2.1, "tex_graffiti_mural","tex_graffiti_mural.jpg", 0.35);
-  wallArt(4.78, 1.4, 1.4, 1.9, "tex_posters","tex_posters.jpg", 0.3);
+  // street-art mural and poster/sticker collage read fine as cluttered bar
+  // wall art either way — kept as the room's "environmental storytelling"
+  wallArt(1.85, 2.0, 2.0, 1.95, "tex_graffiti_mural","tex_graffiti_mural.jpg", 0.3);
+  wallArt(4.78, 1.3, 1.3, 1.85, "tex_posters","tex_posters.jpg", 0.28);
 
-  // black steel columns on the wall joints the sconces don't already occupy
+  // reclaimed black-steel columns on the wall joints the lamps don't occupy
   for(const i of [0.5, 2.5, 4.5, 5.5, 7.5, 9.5]){
     const p = wallPoint(SEG*i, 0.1);
     const col = new THREE.Mesh(new THREE.BoxGeometry(0.1, WALL_H, 0.1), steel);
@@ -374,63 +377,135 @@ function buildCyberBar(){
     g.add(col);
   }
 
-  // ---- the bar station: green-neon canopy bar on the wall facing the player ----
+  // one small red neon accent — a simple diamond outline, the reference's
+  // single cool-colored sign against an otherwise all-warm room
+  {
+    const m = new THREE.MeshStandardMaterial({color:0xff2020, emissive:0xff2020, emissiveIntensity:2.2, roughness:0.4});
+    const p = wallPoint(2.15, 0.15), grp = new THREE.Group();
+    grp.position.set(p.x, 2.1, p.z); grp.rotation.y = 2.15 + Math.PI;
+    for(const rot of [0.78, -0.78]){
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.55, 0.035), m);
+      b.rotation.z = rot; b.position.x = rot>0 ? -0.19 : 0.19;
+      grp.add(b);
+    }
+    g.add(grp);
+    const wash = new THREE.PointLight(0xff2020, 0.8, 3.5, 2);
+    wash.position.copy(grp.position); g.add(wash);
+  }
+
+  // ---- the bar station: warm wooden counter with a backlit liquor shelf ----
   // built in wall-local coordinates (x along the wall, +z into the room)
   {
     const bar = new THREE.Group();
     bar.position.copy(wallPoint(BAR_ANGLE, 0));
     bar.rotation.y = BAR_ANGLE + Math.PI;
-    // green backlit panel behind the bottle shelf
-    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.7), neon(0x1aff5a, 0.42));
+    // warm backlit panel behind the bottle shelf (mirror-and-lightbox look)
+    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.7),
+      new THREE.MeshStandardMaterial({color:0xffb060, emissive:0xffa040, emissiveIntensity:0.55}));
     glowPanel.position.set(0, 1.35, 0.3); bar.add(glowPanel);
-    // steel canopy over the counter, front edge lined with green neon
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.1,1.6), steel);
+    // reclaimed-wood canopy over the counter, hung with a row of bare bulbs
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.1,1.6), wood);
     canopy.position.set(0, 2.78, 1.1); bar.add(canopy);
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(3.64,0.05,0.05), neon(0x1ee85a, 1.35));
-    edge.position.set(0, 2.74, 1.9); bar.add(edge);
-    for(const sx of [-1.8, 1.8]){
-      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,1.6,8), neon(0x1ee85a, 1.25));
-      tube.position.set(sx, 1.95, 1.9); bar.add(tube);
+    for(let i=0;i<9;i++){
+      const bx = -1.75 + i*0.44;
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.14,4), new THREE.MeshBasicMaterial({color:0x0a0a0a}));
+      cord.position.set(bx, 2.66, 1.9); bar.add(cord);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035,8,8),
+        new THREE.MeshStandardMaterial({color:0xffd898, emissive:0xffb050, emissiveIntensity:2.8}));
+      bulb.position.set(bx, 2.58, 1.9); bar.add(bulb);
     }
-    // long counter with the glowing green lip along its front edge
-    const counter = new THREE.Mesh(new THREE.BoxGeometry(3.4,1.0,0.5),
-      new THREE.MeshStandardMaterial({color:0x3a2214, roughness:0.75, emissive:0x0c0504, emissiveIntensity:0.5}));
+    // long wooden counter with a polished brass trim along its front edge
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(3.4,1.0,0.5), wood);
     counter.position.set(0, 0.5, 1.45); bar.add(counter);
     const top = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.05,0.66), darkTop);
     top.position.set(0, 1.03, 1.45); bar.add(top);
-    const lip = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.04,0.04), neon(0x1ee85a, 1.6));
-    lip.position.set(0, 1.0, 1.79); bar.add(lip);
-    const greenGlow = new THREE.PointLight(0x2aff6a, 2.4, 7, 1.6);
-    greenGlow.position.set(0, 1.4, 1.9); bar.add(greenGlow);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.04,0.04), brass);
+    trim.position.set(0, 1.0, 1.79); bar.add(trim);
+    const warmGlow = new THREE.PointLight(0xffab5a, 2.0, 7, 1.6);
+    warmGlow.position.set(0, 1.4, 1.9); bar.add(warmGlow);
+    // glowing tank on the counter — the reference's one cool blue-violet
+    // accent against all the warm amber; a translucent box + inner light
+    const tank = new THREE.Group();
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.36,0.32),
+      new THREE.MeshPhysicalMaterial({color:0x2a5aff, transparent:true, opacity:0.35, roughness:0.1, metalness:0, transmission:0.4}));
+    glass.position.set(1.35, 1.24, 1.55); tank.add(glass);
+    const tankLight = new THREE.PointLight(0x6a4aff, 1.3, 2.4, 2);
+    tankLight.position.set(1.35, 1.24, 1.55); tank.add(tankLight);
+    bar.add(tank);
     g.add(bar);
   }
 
-  // scattered abstract neon signage on the side walls (shapes only, no text)
-  const wallNeon = (ang, y, fn)=>{
-    const sub = new THREE.Group();
-    const p = wallPoint(ang, 0.15);
-    sub.position.set(p.x, y, p.z); sub.rotation.y = ang + Math.PI;
-    fn(sub); g.add(sub);
-  };
-  wallNeon(4.42, 2.25, s=>{           // pink rectangle outline
-    const m = neon(0xff2a7a, 1.8);
-    for(const [w,h,x,y] of [[0.9,0.05,0,0.55],[0.9,0.05,0,-0.55],[0.05,1.1,-0.45,0],[0.05,1.1,0.45,0]]){
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w,h,0.04), m); b.position.set(x,y,0); s.add(b);
+  // wagon wheel — wood rim + spokes, hung flat overhead near the bar, with
+  // a small bulb at every spoke tip, a classic roadhouse ceiling fixture
+  {
+    const wheel = new THREE.Group();
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.05, 8, 20), wood);
+    rim.rotation.x = Math.PI/2; wheel.add(rim);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.12,10), wood);
+    wheel.add(hub);
+    for(let i=0;i<8;i++){
+      const a = (Math.PI*2/8)*i;
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.75,6), wood);
+      spoke.position.set(Math.sin(a)*0.375, 0, Math.cos(a)*0.375);
+      spoke.rotation.x = Math.PI/2; spoke.rotation.z = a;
+      wheel.add(spoke);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03,8,8),
+        new THREE.MeshStandardMaterial({color:0xffd090, emissive:0xffa030, emissiveIntensity:2.5}));
+      bulb.position.set(Math.sin(a)*0.75, 0, Math.cos(a)*0.75);
+      wheel.add(bulb);
     }
-  });
-  wallNeon(2.5, 2.35, s=>{            // cyan slashes
-    const m = neon(0x2ae0ff, 1.8);
-    for(const dx of [-0.14, 0.14]){
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.9,0.04), m);
-      b.position.set(dx,0,0); b.rotation.z = 0.35; s.add(b);
+    const wp = wallPoint(BAR_ANGLE, 2.4);
+    wheel.position.set(wp.x, WALL_H-0.35, wp.z);
+    g.add(wheel);
+    const wheelGlow = new THREE.PointLight(0xffb060, 1.0, 4, 1.8);
+    wheelGlow.position.copy(wheel.position); g.add(wheelGlow);
+  }
+
+  // dartboard — canvas-drawn concentric rings on a disc, mounted on a wall
+  {
+    const cv = document.createElement("canvas"); cv.width = 256; cv.height = 256;
+    const cx = cv.getContext("2d");
+    cx.fillStyle = "#1c1108"; cx.fillRect(0,0,256,256);
+    const rings = [[118,"#2a1a10"],[100,"#e8dcc0"],[82,"#1a3a1e"],[64,"#8a1414"],[46,"#e8dcc0"],[28,"#1a3a1e"],[10,"#8a1414"]];
+    for(const [r,c] of rings){ cx.fillStyle=c; cx.beginPath(); cx.arc(128,128,r,0,Math.PI*2); cx.fill(); }
+    cx.strokeStyle = "rgba(0,0,0,.4)"; cx.lineWidth = 2;
+    for(let i=0;i<20;i++){ const a=(Math.PI*2/20)*i; cx.beginPath(); cx.moveTo(128,128);
+      cx.lineTo(128+Math.cos(a)*118, 128+Math.sin(a)*118); cx.stroke(); }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.04,24),
+      new THREE.MeshStandardMaterial({map:tex, roughness:0.7}));
+    const dp = wallPoint(2.85, 0.13);
+    board.position.set(dp.x, 1.7, dp.z); board.rotation.z = Math.PI/2; board.rotation.y = 2.85;
+    g.add(board);
+  }
+
+  // crossed reclaimed-wood beams — simple wall ornament, right side wall
+  {
+    const cp = wallPoint(1.5, 0.12), grp = new THREE.Group();
+    grp.position.set(cp.x, 2.5, cp.z); grp.rotation.y = 1.5 + Math.PI;
+    for(const rot of [0.7, -0.7]){
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.1, 0.06), wood);
+      beam.rotation.z = rot; grp.add(beam);
     }
-  });
-  wallNeon(5.45, 2.2, s=>{            // red triple bars
-    const m = neon(0xff2020, 1.8);
-    for(const dx of [-0.2, 0, 0.2]){
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.05,1.2,0.04), m); b.position.set(dx,0,0); s.add(b);
+    g.add(grp);
+  }
+
+  // pennant bunting — small triangular flags strung along a slack curve,
+  // generic red/white/blue stripes (no real flag or logo), festive clutter
+  {
+    const colors = [0xb02020, 0xd8d0c0, 0x20408a];
+    const p0 = wallPoint(0.15, 0.3); p0.y = WALL_H - 0.55;
+    const p1 = wallPoint(1.05, 0.3); p1.y = WALL_H - 0.75;
+    const mid = p0.clone().lerp(p1,0.5); mid.y -= 0.35;
+    const curve = new THREE.QuadraticBezierCurve3(p0, mid, p1);
+    for(let i=0;i<14;i++){
+      const t = i/13, pos = curve.getPoint(t);
+      const flag = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.09, 3),
+        new THREE.MeshStandardMaterial({color: colors[i%3], roughness:0.75}));
+      flag.position.copy(pos); flag.rotation.z = Math.PI; flag.rotation.y = t*3;
+      g.add(flag);
     }
-  });
+  }
 
   // leather booth against the right wall
   {
@@ -446,18 +521,18 @@ function buildCyberBar(){
     g.add(booth);
   }
 
-  // tall round cocktail tables with a red-topped stool each
+  // low wooden cocktail tables with a worn stool each
   const cocktail = (ang, inset)=>{
     const p = wallPoint(ang, inset), grp = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.04, 14), steel);
     base.position.y = 0.02; grp.add(base);
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.95, 8), steel);
     stem.position.y = 0.5; grp.add(stem);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.045, 16), darkTop);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.045, 16), wood);
     top.position.y = 1.0; grp.add(top);
     grp.position.set(p.x, 0, p.z);
     g.add(grp);
-    const stool = makeStool(0x7a1616);
+    const stool = makeStool(0x241812);
     const sp = wallPoint(ang + 0.09, inset - 0.35);
     stool.position.copy(sp);
     g.add(stool);
@@ -465,45 +540,44 @@ function buildCyberBar(){
   cocktail(2.55, 1.9);
   cocktail(3.9, 1.9);
 
-  // hanging pendant lamps — dark cone shades with a warm bulb, like the
-  // dome lamps over a bar; only two carry real (shadowless) lights
-  const pendant = (x, z, y, withLight)=>{
+  // hanging pendant lamps — a big warm cone shade near the player (the
+  // reference's foreground lamp) plus smaller ones scattered over seating
+  const pendant = (x, z, y, radius, withLight)=>{
     const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008, WALL_H-0.15-y, 4),
       new THREE.MeshBasicMaterial({color:0x0a0a0a}));
     cord.position.set(x, (WALL_H-0.15+y)/2, z); g.add(cord);
-    const shade = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.26, 18, 1, true),
-      new THREE.MeshStandardMaterial({color:0x181410, roughness:0.5, metalness:0.4, side:THREE.DoubleSide}));
+    const shade = new THREE.Mesh(new THREE.ConeGeometry(radius, radius*0.85, 18, 1, true),
+      new THREE.MeshStandardMaterial({color:0xc06a1e, emissive:0x4a2408, emissiveIntensity:0.6, roughness:0.5, side:THREE.DoubleSide}));
     shade.position.set(x, y, z); g.add(shade);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8),
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(radius*0.22, 10, 8),
       new THREE.MeshStandardMaterial({color:0xffc070, emissive:0xffa040, emissiveIntensity:3}));
-    bulb.position.set(x, y-0.06, z); g.add(bulb);
+    bulb.position.set(x, y-radius*0.22, z); g.add(bulb);
     if(withLight){
-      const l = new THREE.PointLight(0xff9a40, 1.4, 4.5, 1.8);
-      l.position.set(x, y-0.15, z); g.add(l);
+      const l = new THREE.PointLight(0xff9a40, 1.5, 5, 1.8);
+      l.position.set(x, y-radius*0.5, z); g.add(l);
     }
   };
   {
+    // large foreground lamp, low and close over a seat — echoes the
+    // reference's big cropped orange shade in the near corner
+    const pf = wallPoint(BAR_ANGLE-1.6, 2.6);
+    pendant(pf.x, pf.z, 2.0, 0.42, true);
     const pl = wallPoint(BAR_ANGLE-0.18, 2.3), pr = wallPoint(BAR_ANGLE+0.18, 2.3);
-    pendant(pl.x, pl.z, 2.55, true);
-    pendant(pr.x, pr.z, 2.55, false);
+    pendant(pl.x, pl.z, 2.55, 0.28, true);
+    pendant(pr.x, pr.z, 2.55, 0.28, false);
     const pb = wallPoint(1.2, 1.0);
-    pendant(pb.x, pb.z, 2.5, false);
+    pendant(pb.x, pb.z, 2.5, 0.26, false);
     const pc = wallPoint(2.55, 1.9);
-    pendant(pc.x, pc.z, 2.45, false);
+    pendant(pc.x, pc.z, 2.45, 0.26, false);
     const pd = wallPoint(3.9, 1.9);
-    pendant(pd.x, pd.z, 2.45, true);
+    pendant(pd.x, pd.z, 2.45, 0.26, true);
   }
-
-  // loose red wash over the open floor, opposite the green bar glow
-  const redWash = new THREE.PointLight(0xff2030, 1.6, 8, 1.6);
-  redWash.position.set(2.9, 2.0, -2.0);
-  g.add(redWash);
 
   scene.add(g);
   enableShadow(g);
   return g;
 }
-buildCyberBar();
+buildRoadhouseBar();
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
 const SEATS = [
