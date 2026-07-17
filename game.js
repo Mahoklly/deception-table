@@ -585,55 +585,6 @@ function buildRoadhouseBar(){
 }
 buildRoadhouseBar();
 
-/* ---- background patrons: a bartender + customers scattered around the
-   room, so it reads as a real, lived-in bar instead of an empty stage
-   with just the three players. Purely decorative capsule+sphere bodies
-   (same silhouette language as the placeholder players), idly swaying —
-   no game logic, no dialogue, they never affect the match. */
-const patrons = [];
-const PATRON_PALETTE = [0x8a6a4a, 0x6a7a5a, 0x7a5a6a, 0x5a6a7a, 0x9a7a4a, 0x6a5a4a];
-function makePatronBody(color, scale){
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.24*scale,0.56*scale,6,14),
-    new THREE.MeshStandardMaterial({color, roughness:0.85}));
-  body.position.y = 0.7*scale; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17*scale,14,12),
-    new THREE.MeshStandardMaterial({color:0xcfae87, roughness:0.8}));
-  head.position.y = 1.24*scale; g.add(head);
-  return { group:g, body };
-}
-function addPatron(x, z, rotY, seatedY){
-  const scale = 0.92 + rng()*0.18;
-  const color = PATRON_PALETTE[Math.floor(rng()*PATRON_PALETTE.length)];
-  const { group } = makePatronBody(color, scale);
-  group.position.set(x, seatedY!=null ? seatedY : 0, z);
-  group.rotation.y = rotY + (rng()-0.5)*0.5; // a little variety, not all facing dead-on
-  enableShadow(group);
-  scene.add(group);
-  patrons.push({ group, phase: rng()*6.28, baseY: group.position.y });
-}
-{
-  // the bartender, planted behind the counter, facing the room
-  const bp = wallPoint(BAR_ANGLE, 0.12);
-  addPatron(bp.x, bp.z, BAR_ANGLE + Math.PI, 0);
-  // two customers on the outer bar stools (the middle two stay open)
-  for(const off of [-0.19, 0.19]){
-    const sp = wallPoint(BAR_ANGLE + off, 2.05);
-    addPatron(sp.x, sp.z, BAR_ANGLE, 0.32);
-  }
-  // one more leaning at the bar, further down the counter
-  const sb = wallPoint(BAR_ANGLE - 0.4, 2.35);
-  addPatron(sb.x, sb.z, BAR_ANGLE + 0.4, 0);
-  // seated at the two cocktail tables
-  for(const [ang, inset] of [[2.55,1.9],[3.9,1.9]]){
-    const sp = wallPoint(ang + 0.09, inset - 0.35);
-    addPatron(sp.x, sp.z, ang + Math.PI, 0.32);
-  }
-  // one loitering near the booth
-  const lb = wallPoint(1.2, 1.35);
-  addPatron(lb.x, lb.z, 1.2 + Math.PI, 0);
-}
-
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
 const SEATS = [
@@ -654,6 +605,22 @@ function normalize(obj, targetH, groundY=0){
   const c = box2.getCenter(new THREE.Vector3());
   obj.position.x -= c.x; obj.position.z -= c.z;
   obj.traverse(m=>{ if(m.isMesh){ m.material && (m.material.side = THREE.FrontSide); } });
+  return obj;
+}
+/* some source GLBs (this revolver included) are authored standing upright
+   rather than lying on their side — whatever axis came out tallest after
+   normalize() is presumably the barrel-to-grip length, not real height, so
+   tip it onto its side and re-ground/re-center against the fresh box. */
+function layFlat(obj, groundY=0){
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  if(size.y > size.x && size.y > size.z){
+    obj.rotation.x = Math.PI/2;
+    const box2 = new THREE.Box3().setFromObject(obj);
+    const c = box2.getCenter(new THREE.Vector3());
+    obj.position.x -= c.x; obj.position.z -= c.z;
+    obj.position.y += groundY - box2.min.y;
+  }
   return obj;
 }
 function placeholderChar(color){
@@ -919,7 +886,7 @@ scene.add(ch);
     table.add(revCase);
     enableShadow(revCase);
   }
-  const gunMesh = gGun ? normalize(gGun, 0.2) : makeRevolverModel();
+  const gunMesh = gGun ? layFlat(normalize(gGun, 0.2)) : makeRevolverModel();
   revolver = new THREE.Group(); revolver.add(gunMesh);
   enableShadow(revolver);
   revolver.position.copy(revolverHome); revolver.rotation.y = rng()*6.28;
@@ -1640,13 +1607,6 @@ function update(dt){
     a.inner.rotation.y = g;
     a.inner.position.y = (a.baseY||0) - a.slump*0.35;
     a.inner.scale.y = a.inner.scale.x * (1+breatheAmt); // uses normalize's uniform scale as base
-  }
-  // background patrons: a slow idle sway, just enough that the room reads
-  // as populated rather than frozen — no bearing on the match whatsoever
-  for(const p of patrons){
-    p.phase += dt*0.0009;
-    p.group.position.y = p.baseY + Math.sin(p.phase)*0.006;
-    p.group.rotation.z = Math.sin(p.phase*0.7)*0.015;
   }
   // candle flicker
   candle.intensity = 3.4 + Math.sin(clock.t*0.011)*0.3 + Math.sin(clock.t*0.037)*0.2;
