@@ -227,12 +227,17 @@ function applyOnceTex(material, key, file, glow=1){
 }
 // where the bar station goes on the wall polygon (also anchors the sign + shelf)
 const BAR_ANGLE = Math.PI;   // dead-center on the back wall, facing the player across the table
+// mouse-look only swings the camera roughly ±0.85 rad off the forward
+// baseline (which points at BAR_ANGLE) — anything placed near BAR_ANGLE±π
+// is never actually reachable, so the vestibule doorway has to sit well
+// inside that cone instead of on the literal opposite wall
+const VESTIBULE_ANGLE = BAR_ANGLE - 0.628;
 function wallPoint(ang, inset=0){
   const r = ROOM_R - inset;
   return new THREE.Vector3(Math.sin(ang)*r, 0, Math.cos(ang)*r);
 }
 const floorMat = new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9});
-applyRepeatTex(floorMat, "tex_wood_floor","tex_wood_floor.jpg", 6, 6, 0xa8875c);
+applyRepeatTex(floorMat, "tex_wood_floor","tex_wood_floor.jpg", 6, 6);   // no tint — let the real photo read as-is
 const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_R, 48), floorMat);
 floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
 let roomGroup = null;
@@ -251,9 +256,15 @@ function buildRoom(){
   const plaster = new THREE.MeshStandardMaterial({color:0x4a3a26, roughness:0.95, emissive:0x140d06, emissiveIntensity:0.7});
   const trim    = new THREE.MeshStandardMaterial({color:0x2a1d10, roughness:0.9, emissive:0x0c0704, emissiveIntensity:0.6});
   const beamMat = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.85, emissive:0x0a0603, emissiveIntensity:0.6});
-  applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", segW/2.1, WALL_H/2.1, 0xc9a876);
+  applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", segW/2.1, WALL_H/2.1);   // no tint — let the real photo read as-is
 
+  // the wall segment at VESTIBULE_ANGLE — inside the reachable look-around
+  // cone, just off to the side of the bar — is left open; buildVestibule()
+  // frames it as a doorway into a dim back room, so the space has a real
+  // edge that leads somewhere instead of being a fully sealed drum
+  const vestibuleIdx = Math.round(VESTIBULE_ANGLE/segAngle);
   for(let i=0;i<SIDES;i++){
+    if(i===vestibuleIdx) continue;
     const ang = segAngle*i;
     const wall = new THREE.Mesh(new THREE.BoxGeometry(segW, WALL_H, 0.28), plaster);
     wall.position.set(Math.sin(ang)*ROOM_R, WALL_H/2, Math.cos(ang)*ROOM_R);
@@ -399,9 +410,12 @@ function buildRoadhouseBar(){
     const bar = new THREE.Group();
     bar.position.copy(wallPoint(BAR_ANGLE, 0));
     bar.rotation.y = BAR_ANGLE + Math.PI;
-    // warm backlit panel behind the bottle shelf (mirror-and-lightbox look)
-    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.7),
-      new THREE.MeshStandardMaterial({color:0xffb060, emissive:0xffa040, emissiveIntensity:0.55}));
+    // real backlit-shelf photo (rows of bottles against a lit mirror) instead
+    // of a flat emissive color card — falls back to a plain amber panel only
+    // until/unless the photo loads
+    const glowPanelMat = new THREE.MeshStandardMaterial({color:0xffb060, emissive:0xffa040, emissiveIntensity:0.55});
+    applyOnceTex(glowPanelMat, "tex_backlit_shelf","tex_backlit_shelf.jpg", 0.65);
+    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.7), glowPanelMat);
     glowPanel.position.set(0, 1.35, 0.3); bar.add(glowPanel);
     // reclaimed-wood canopy over the counter, hung with a row of bare bulbs
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.1,1.6), wood);
@@ -628,6 +642,52 @@ function addPatron(x, z, rotY, seatedY){
   addPatron(lb.x, lb.z, 1.2 + Math.PI, 0);
 }
 
+/* ---- vestibule: a doorway framed into the gap left open at VESTIBULE_ANGLE
+   — just off to the side of the bar, inside the reachable look-around cone
+   — leading to a short dim back room with someone standing in it. Built in
+   a group rotated to that wall's own outward direction (local +Z = away
+   from room center), so the same local layout works at any angle. */
+function buildVestibule(){
+  const holder = new THREE.Group();
+  holder.position.copy(wallPoint(VESTIBULE_ANGLE, 0));
+  holder.rotation.y = VESTIBULE_ANGLE;
+  const g = new THREE.Group(); holder.add(g);
+
+  const SIDES = 10, segAngle = (Math.PI*2)/SIDES;
+  const segW = 2*ROOM_R*Math.tan(segAngle/2)*1.03;
+  const wood = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.9});
+  const frameMat = new THREE.MeshStandardMaterial({color:0x140d08, roughness:0.7, metalness:0.3});
+  const doorW = segW*0.62, doorH = WALL_H*0.62;
+
+  for(const [w,h,x,y] of [[doorW+0.16,0.1,0,doorH+0.02],[0.1,doorH,-doorW/2-0.03,doorH/2],[0.1,doorH,doorW/2+0.03,doorH/2]]){
+    const f = new THREE.Mesh(new THREE.BoxGeometry(w,h,0.3), frameMat);
+    f.position.set(x, y, 0); g.add(f);
+  }
+  const depth = 2.0;
+  const floor2 = new THREE.Mesh(new THREE.BoxGeometry(doorW, 0.05, depth), wood);
+  floor2.position.set(0, 0.025, depth/2); g.add(floor2);
+  const ceil2 = new THREE.Mesh(new THREE.BoxGeometry(doorW, 0.05, depth), wood);
+  ceil2.position.set(0, WALL_H, depth/2); g.add(ceil2);
+  for(const sx of [-doorW/2, doorW/2]){
+    const wall2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, WALL_H, depth), wood);
+    wall2.position.set(sx, WALL_H/2, depth/2); g.add(wall2);
+  }
+  const endWall = new THREE.Mesh(new THREE.BoxGeometry(doorW, WALL_H, 0.1), wood);
+  endWall.position.set(0, WALL_H/2, depth); g.add(endWall);
+
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,8),
+    new THREE.MeshStandardMaterial({color:0xffcf8a, emissive:0xffa030, emissiveIntensity:2}));
+  bulb.position.set(0, WALL_H-0.5, depth*0.6); g.add(bulb);
+  const dimLight = new THREE.PointLight(0xffa855, 0.9, 3.5, 1.8);
+  dimLight.position.copy(bulb.position); g.add(dimLight);
+
+  scene.add(holder);
+  enableShadow(holder);
+  const pp = wallPoint(VESTIBULE_ANGLE, -depth*0.68);   // negative inset = beyond ROOM_R
+  addPatron(pp.x, pp.z, VESTIBULE_ANGLE + Math.PI, 0);   // a lone figure glimpsed through the doorway
+}
+buildVestibule();
+
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
 const SEATS = [
@@ -669,6 +729,71 @@ function makeActorShell(seatIdx){
   return { seat:seatIdx, group, inner:null, alive:true, breathe:rng()*6.28, lean:0, slump:0, glance:0, glanceDir:0 };
 }
 
+/* real-geometry poker table: dark wood rim, a canvas-drawn green felt
+   inlay, brass rivets around the edge, wrought-iron banded pedestal leg —
+   used until/unless a Meshy-generated table_tavern.glb is hooked up */
+function makePokerTableTopTex(){
+  const cv = document.createElement("canvas"); cv.width=512; cv.height=512;
+  const cx = cv.getContext("2d");
+  cx.fillStyle = "#2a1a0e"; cx.fillRect(0,0,512,512);
+  cx.strokeStyle = "#1c1108"; cx.lineWidth = 2; cx.globalAlpha = 0.15;
+  for(let i=0;i<40;i++){ cx.beginPath(); cx.arc(256,256,60+i*5,0,Math.PI*2); cx.stroke(); }
+  cx.globalAlpha = 1;
+  const feltR = 200;
+  const grad = cx.createRadialGradient(256,256,10,256,256,feltR);
+  grad.addColorStop(0,"#1f5c34"); grad.addColorStop(1,"#123c22");
+  cx.fillStyle = grad; cx.beginPath(); cx.arc(256,256,feltR,0,Math.PI*2); cx.fill();
+  cx.strokeStyle = "#0d2415"; cx.lineWidth = 6;
+  cx.beginPath(); cx.arc(256,256,feltR,0,Math.PI*2); cx.stroke();
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function makePokerTable(){
+  const t = new THREE.Group();
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,0.09,32),
+    new THREE.MeshStandardMaterial({map: makePokerTableTopTex(), roughness:0.75}));
+  top.position.y = 0.92; t.add(top);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.05,0.035,8,32),
+    new THREE.MeshStandardMaterial({color:0x1c1108, roughness:0.6}));
+  rim.rotation.x = Math.PI/2; rim.position.y = 0.94; t.add(rim);
+  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.35, metalness:0.75});
+  for(let i=0;i<16;i++){
+    const a = (Math.PI*2/16)*i;
+    const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.018,8,6), brass);
+    rivet.position.set(Math.sin(a)*1.02, 0.955, Math.cos(a)*1.02);
+    t.add(rivet);
+  }
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,0.92,10),
+    new THREE.MeshStandardMaterial({color:0x2a1d10, roughness:0.9}));
+  leg.position.y = 0.46; t.add(leg);
+  const iron = new THREE.MeshStandardMaterial({color:0x1c1c1e, roughness:0.4, metalness:0.7});
+  for(const hy of [0.18, 0.72]){
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.165,0.018,6,20), iron);
+    band.rotation.x = Math.PI/2; band.position.y = hy; t.add(band);
+  }
+  return t;
+}
+/* real-geometry western revolver: barrel, cylinder drum, frame, wood grip,
+   hammer and trigger guard — used until a Meshy-generated revolver.glb
+   is hooked up */
+function makeRevolverModel(){
+  const g = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({color:0x2a2a2e, roughness:0.32, metalness:0.85});
+  const wood  = new THREE.MeshStandardMaterial({color:0x3a2414, roughness:0.6});
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.16,10), steel);
+  barrel.rotation.z = Math.PI/2; barrel.position.set(0.06,0.03,0); g.add(barrel);
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,0.045,10), steel);
+  cyl.rotation.z = Math.PI/2; cyl.position.set(-0.02,0.03,0); g.add(cyl);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.03,0.02), steel);
+  frame.position.set(-0.005,0.03,0); g.add(frame);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.03,0.07,0.022), wood);
+  grip.position.set(-0.05,-0.01,0); grip.rotation.z = -0.35; g.add(grip);
+  const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.012,0.02,0.014), steel);
+  hammer.position.set(-0.035,0.05,0); g.add(hammer);
+  const trigger = new THREE.Mesh(new THREE.TorusGeometry(0.014,0.004,6,10,Math.PI), steel);
+  trigger.position.set(-0.02,0.005,0); trigger.rotation.z = Math.PI; g.add(trigger);
+  return g;
+}
 let table=null, revolver=null, tableTopY=0.95, worldReady=false, cardBackTex=null;
 const cards=[];
 const revolverHome = new THREE.Vector3(0.28, 0, 0.15);
@@ -719,11 +844,7 @@ async function loadWorld(){
       scene.add(stool);
     }
   }
-  table = gTable ? normalize(gTable, 0.95) :
-    (()=>{ const t=new THREE.Group();
-      const top=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,0.09,28), new THREE.MeshStandardMaterial({color:0x3a2a16,roughness:0.8})); top.position.y=0.92; t.add(top);
-      const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,0.92,10), new THREE.MeshStandardMaterial({color:0x2a1d10,roughness:0.9})); leg.position.y=0.46; t.add(leg);
-      return t; })();
+  table = gTable ? normalize(gTable, 0.95) : makePokerTable();
   enableShadow(table);
   scene.add(table);
   // table top height for props
@@ -757,8 +878,7 @@ scene.add(ch);
 }
   actors[0] = { seat:0, group:null, alive:true, npc:null }; // the player
 
-  const gunMesh = gGun ? normalize(gGun, 0.2) :
-    new THREE.Mesh(new THREE.BoxGeometry(0.22,0.08,0.05), new THREE.MeshStandardMaterial({color:0x5a5a5f,roughness:0.4,metalness:0.7}));
+  const gunMesh = gGun ? normalize(gGun, 0.2) : makeRevolverModel();
   revolver = new THREE.Group(); revolver.add(gunMesh);
   enableShadow(revolver);
   revolver.position.copy(revolverHome); revolver.rotation.y = rng()*6.28;
