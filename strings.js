@@ -96,7 +96,6 @@ en: {
   buy_clue: "Buy a Clue — {n} chips",
   settings_newgame: "🔄 New Game",
   settings_quit: "🚪 Quit Game",
-  newgame_confirm: "Start a new game? Your current match will be abandoned.",
   quit_confirm: "Quit the game?",
   quit_title: "Thanks for playing!",
   quit_body: "The Deception Table — you can close this tab now.",
@@ -105,6 +104,7 @@ en: {
   radio_station_dust: "Dust & Whiskey",
   radio_station_porch: "Back Porch Blues",
   radio_station_static: "Smoke & Static",
+  wrong_vote_penalty: "Wrong vote — their chips are seized and split among the rest",
 },
 ku: {
   title_blurb: "سێیان لەنێوان ئێوەدا نهێنیەکی هاوبەشیان هەیە. یەکێکتان تەنها ئاماژەیەکی هەیە. هەر خولێک وشەیەک بڵێ — بەقەد پێویست شاراوە بۆ پاراستنی نهێنییەکە، بەقەد پێویست ڕوون بۆ سەلماندنی زانینت. پاشان دەنگ بدە. تفەنگەکە پاشماوەکە چارەسەر دەکات.",
@@ -195,7 +195,6 @@ ku: {
   buy_clue: "ئاماژەیەک بکڕە — {n} چیپ",
   settings_newgame: "🔄 یاریەکی نوێ",
   settings_quit: "🚪 وازهێنان لە یاری",
-  newgame_confirm: "یاریەکی نوێ دەست پێ بکەیت؟ یاریە ئێستاکەت وازلێدەهێنرێت.",
   quit_confirm: "وازلە یاری بهێنیت؟",
   quit_title: "سوپاس بۆ یاریکردن!",
   quit_body: "خشتەی درۆ — ئێستا دەتوانیت ئەم تابە دابخەیت.",
@@ -204,6 +203,7 @@ ku: {
   radio_station_dust: "تۆز و ویسکی",
   radio_station_porch: "بلوزی ئێوارە",
   radio_station_static: "دووکەڵ و نویز",
+  wrong_vote_penalty: "دەنگدانی هەڵە — چیپەکانیان دەسڕدرێن و دابەش دەکرێن",
 },
 };
 

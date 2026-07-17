@@ -257,7 +257,9 @@ updateModeButtons();
 
 /* ---------------- New Game / Quit (Settings) ---------------- */
 document.getElementById("newGameBtn").addEventListener("click", ()=>{
-  if(!confirm(STR.newgame_confirm)) return;
+  // no confirm() here on purpose — a blocking native dialog for every
+  // restart was worse than the risk it guarded against (nothing valuable
+  // is lost; coins/shop/mode all persist through the reload regardless)
   location.reload();
 });
 document.getElementById("quitGameBtn").addEventListener("click", ()=>{
@@ -1218,6 +1220,33 @@ async function loseChipsToTable(seat){
   await Promise.all(survivors.map((s,idx)=> flyChips(seat, s, amounts[idx])));
   survivors.forEach((s,idx)=>{ chipCounts[s]+=amounts[idx]; rebuildChipStack(s); });
 }
+/* the table wrongly condemned an innocent seat this round — everyone who
+   voted for that innocent seat forfeits a quarter of their current stake
+   (min 3), split across everyone who didn't vote for them. A cost for
+   careless/wrong accusations without the swinginess of instant death. */
+async function penalizeWrongVoters(wrongVoters){
+  const correctVoters = aliveSeats().filter(s=>!wrongVoters.includes(s));
+  if(!correctVoters.length) return;
+  const flights = [];
+  for(const w of wrongVoters){
+    const total = chipCounts[w];
+    const penalty = Math.min(total, Math.max(3, Math.round(total*0.25)));
+    if(penalty<=0) continue;
+    chipCounts[w] -= penalty;
+    rebuildChipStack(w);
+    const each = Math.floor(penalty/correctVoters.length);
+    let remainder = penalty - each*correctVoters.length;
+    correctVoters.forEach((s,idx)=>{
+      const amt = each + (idx<remainder?1:0);
+      chipCounts[s]+=amt;
+      flights.push(flyChips(w, s, amt));
+    });
+  }
+  await Promise.all(flights);
+  correctVoters.forEach(s=>rebuildChipStack(s));
+  setBanner(STR.wrong_vote_penalty, 2000);
+  await sleep(1200);
+}
 /* real-geometry western revolver: barrel, cylinder drum, frame, wood grip,
    hammer and trigger guard — used until a Meshy-generated revolver.glb
    is hooked up */
@@ -2074,15 +2103,17 @@ async function doVote(){
   setPrompt(STR.prompt_vote);
   play("drum");
   const votes = {};
+  const chosenBy = {}; // seat -> who they voted for, so a wrong majority can be penalized afterward
   // player votes via UI
   const myPick = await offerVote();
-  votes[myPick]=(votes[myPick]||0)+1;
+  votes[myPick]=(votes[myPick]||0)+1; chosenBy[0]=myPick;
   updateTallies(votes);
   await sleep(500);
   // npcs vote with reveal bubbles
   for(const o of aliveSeats()){
     if(o===0) continue;
     const t = npcVote(o);
+    chosenBy[o]=t;
     glanceAt(o,t);
     await sleep(500+rng()*600);
     showBubble(o, npcName(actors[o].npc), nameOf(t), 1500);
@@ -2114,6 +2145,12 @@ async function doVote(){
   await sleep(2300);
   resolveBet(bet, victim, died);
   if(bet) await sleep(2000);
+  // the table just wrongly condemned an innocent seat — everyone who voted
+  // for them (not just the victim) pays for it, in chips rather than blood
+  if(!wasImp){
+    const wrongVoters = Object.keys(chosenBy).filter(s=>+chosenBy[s]===victim).map(Number);
+    if(wrongVoters.length) await penalizeWrongVoters(wrongVoters);
+  }
   // outcomes
   if(wasImp){ endMatch(victim===0 ? "lose_imp" : "win_crew"); return; }
   if(victim===0){ endMatch("lose_shot"); return; }
