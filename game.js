@@ -292,6 +292,10 @@ const CAM_LOOK = new THREE.Vector3(0, 1.0, -0.55);
 let camYaw=0, camPitch=0, camYawT=0, camPitchT=0;
 addEventListener("pointermove", e=>{
   if(e.pointerType && e.pointerType!=="mouse") return;
+  // only steer the camera while the cursor is over the bare 3D viewport —
+  // otherwise moving toward a button (settings, shop, hand/vote/bet) drags
+  // the whole view around right as you're trying to click it
+  if(e.target !== canvas) return;
   camYawT   = -((e.clientX/innerWidth)-0.5)*2*0.85;   // wider — the room is populated now, worth looking around
   camPitchT = -((e.clientY/innerHeight)-0.5)*2*0.32;
 });
