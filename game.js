@@ -137,7 +137,7 @@ const canvas = document.getElementById("c");
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.3;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const DPR_CAP = 1.5;
@@ -167,23 +167,25 @@ addEventListener("resize", resize); addEventListener("orientationchange", resize
 
 /* lights: warm candle at the table, the whole room bathed in amber/orange —
    gritty roadhouse grade: dense strings of warm bulbs do most of the work,
-   one small red neon accent and one blue-violet glow (the tank) break it up */
-scene.add(new THREE.AmbientLight(0x2e2014, 0.7));
+   one small red neon accent and one blue-violet glow (the tank) break it up.
+   Brighter/more visible overall than earlier passes — this is meant to be
+   readable, not a screen you have to squint at. */
+scene.add(new THREE.AmbientLight(0x3a2c1c, 1.1));
 // distance-independent sky/ground wash so the walls read as lit even where
 // the point lights fall off — without this, MeshStandardMaterial walls at
 // the room's edge render as flat black regardless of geometry.
-scene.add(new THREE.HemisphereLight(0x7a5c3a, 0x100a06, 1.65));
-const fill = new THREE.PointLight(0xffab6a, 0.5, 11, 1.4); fill.position.set(0,1.7,2.3); scene.add(fill);
-const candle = new THREE.PointLight(0xffb457, 3.4, 13, 1.4); candle.position.set(0,1.15,0); scene.add(candle);
+scene.add(new THREE.HemisphereLight(0x9a7c52, 0x1c130c, 2.7));
+const fill = new THREE.PointLight(0xffab6a, 0.85, 12, 1.3); fill.position.set(0,1.7,2.3); scene.add(fill);
+const candle = new THREE.PointLight(0xffb457, 3.8, 14, 1.3); candle.position.set(0,1.15,0); scene.add(candle);
 candle.castShadow = true;
 candle.shadow.mapSize.set(1024,1024);
 candle.shadow.camera.near = 0.05; candle.shadow.camera.far = 12; candle.shadow.bias = -0.003;
-const lantern = new THREE.SpotLight(0xe08a2e, 55, 14, 0.7, 0.55, 1.8);
+const lantern = new THREE.SpotLight(0xe08a2e, 65, 15, 0.7, 0.55, 1.7);
 lantern.position.set(0,3.4,0.4); lantern.target.position.set(0,0.9,-0.4); scene.add(lantern, lantern.target);
 lantern.castShadow = true;
 lantern.shadow.mapSize.set(1024,1024);
 lantern.shadow.camera.near = 0.3; lantern.shadow.camera.far = 14; lantern.shadow.bias = -0.0025;
-const rim = new THREE.DirectionalLight(0x3a2414, 0.6); rim.position.set(-3,2.5,-4); scene.add(rim);
+const rim = new THREE.DirectionalLight(0x5a3c22, 0.9); rim.position.set(-3,2.5,-4); scene.add(rim);
 /* generic helper: flag every mesh in a subtree to cast/receive real-time shadows */
 function enableShadow(obj, cast=true, recv=true){
   obj.traverse(m=>{ if(m.isMesh){ m.castShadow = cast; m.receiveShadow = recv; } });
@@ -227,11 +229,6 @@ function applyOnceTex(material, key, file, glow=1){
 }
 // where the bar station goes on the wall polygon (also anchors the sign + shelf)
 const BAR_ANGLE = Math.PI;   // dead-center on the back wall, facing the player across the table
-// mouse-look only swings the camera roughly ±0.85 rad off the forward
-// baseline (which points at BAR_ANGLE) — anything placed near BAR_ANGLE±π
-// is never actually reachable, so the vestibule doorway has to sit well
-// inside that cone instead of on the literal opposite wall
-const VESTIBULE_ANGLE = BAR_ANGLE - 0.628;
 function wallPoint(ang, inset=0){
   const r = ROOM_R - inset;
   return new THREE.Vector3(Math.sin(ang)*r, 0, Math.cos(ang)*r);
@@ -258,13 +255,7 @@ function buildRoom(){
   const beamMat = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.85, emissive:0x0a0603, emissiveIntensity:0.6});
   applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", segW/2.1, WALL_H/2.1);   // no tint — let the real photo read as-is
 
-  // the wall segment at VESTIBULE_ANGLE — inside the reachable look-around
-  // cone, just off to the side of the bar — is left open; buildVestibule()
-  // frames it as a doorway into a dim back room, so the space has a real
-  // edge that leads somewhere instead of being a fully sealed drum
-  const vestibuleIdx = Math.round(VESTIBULE_ANGLE/segAngle);
   for(let i=0;i<SIDES;i++){
-    if(i===vestibuleIdx) continue;
     const ang = segAngle*i;
     const wall = new THREE.Mesh(new THREE.BoxGeometry(segW, WALL_H, 0.28), plaster);
     wall.position.set(Math.sin(ang)*ROOM_R, WALL_H/2, Math.cos(ang)*ROOM_R);
@@ -641,52 +632,6 @@ function addPatron(x, z, rotY, seatedY){
   const lb = wallPoint(1.2, 1.35);
   addPatron(lb.x, lb.z, 1.2 + Math.PI, 0);
 }
-
-/* ---- vestibule: a doorway framed into the gap left open at VESTIBULE_ANGLE
-   — just off to the side of the bar, inside the reachable look-around cone
-   — leading to a short dim back room with someone standing in it. Built in
-   a group rotated to that wall's own outward direction (local +Z = away
-   from room center), so the same local layout works at any angle. */
-function buildVestibule(){
-  const holder = new THREE.Group();
-  holder.position.copy(wallPoint(VESTIBULE_ANGLE, 0));
-  holder.rotation.y = VESTIBULE_ANGLE;
-  const g = new THREE.Group(); holder.add(g);
-
-  const SIDES = 10, segAngle = (Math.PI*2)/SIDES;
-  const segW = 2*ROOM_R*Math.tan(segAngle/2)*1.03;
-  const wood = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.9});
-  const frameMat = new THREE.MeshStandardMaterial({color:0x140d08, roughness:0.7, metalness:0.3});
-  const doorW = segW*0.62, doorH = WALL_H*0.62;
-
-  for(const [w,h,x,y] of [[doorW+0.16,0.1,0,doorH+0.02],[0.1,doorH,-doorW/2-0.03,doorH/2],[0.1,doorH,doorW/2+0.03,doorH/2]]){
-    const f = new THREE.Mesh(new THREE.BoxGeometry(w,h,0.3), frameMat);
-    f.position.set(x, y, 0); g.add(f);
-  }
-  const depth = 2.0;
-  const floor2 = new THREE.Mesh(new THREE.BoxGeometry(doorW, 0.05, depth), wood);
-  floor2.position.set(0, 0.025, depth/2); g.add(floor2);
-  const ceil2 = new THREE.Mesh(new THREE.BoxGeometry(doorW, 0.05, depth), wood);
-  ceil2.position.set(0, WALL_H, depth/2); g.add(ceil2);
-  for(const sx of [-doorW/2, doorW/2]){
-    const wall2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, WALL_H, depth), wood);
-    wall2.position.set(sx, WALL_H/2, depth/2); g.add(wall2);
-  }
-  const endWall = new THREE.Mesh(new THREE.BoxGeometry(doorW, WALL_H, 0.1), wood);
-  endWall.position.set(0, WALL_H/2, depth); g.add(endWall);
-
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,8),
-    new THREE.MeshStandardMaterial({color:0xffcf8a, emissive:0xffa030, emissiveIntensity:2}));
-  bulb.position.set(0, WALL_H-0.5, depth*0.6); g.add(bulb);
-  const dimLight = new THREE.PointLight(0xffa855, 0.9, 3.5, 1.8);
-  dimLight.position.copy(bulb.position); g.add(dimLight);
-
-  scene.add(holder);
-  enableShadow(holder);
-  const pp = wallPoint(VESTIBULE_ANGLE, -depth*0.68);   // negative inset = beyond ROOM_R
-  addPatron(pp.x, pp.z, VESTIBULE_ANGLE + Math.PI, 0);   // a lone figure glimpsed through the doorway
-}
-buildVestibule();
 
 /* ---------------- seats & actors ---------------- */
 // Seat 0 = player (camera). 1=left, 2=front, 3=right.
