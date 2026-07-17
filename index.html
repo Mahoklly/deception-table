@@ -29,7 +29,7 @@ html[data-lang="ku"] .bubble .txt, html[data-lang="ku"] .bubble .who,
 html[data-lang="ku"] .plate, html[data-lang="ku"] .voteBtn .nm,
 html[data-lang="ku"] .panel h1, html[data-lang="ku"] .panel p,
 html[data-lang="ku"] .wordBtn, html[data-lang="ku"] .ghostBtn, html[data-lang="ku"] .big,
-html[data-lang="ku"] #roundTag, html[data-lang="ku"] #myCard .face .word,
+html[data-lang="ku"] #roundTag, html[data-lang="ku"] #coinTag, html[data-lang="ku"] #myCard .face .word,
 html[data-lang="ku"] #myCard .face .hint, html[data-lang="ku"] #myCard .face .lbl,
 html[data-lang="ku"] #loadNote, html[data-lang="ku"] #settingsMenu,
 html[data-lang="ku"] #wordInput{direction:rtl}
@@ -64,6 +64,10 @@ html[data-lang="ku"] #wordInput{direction:rtl}
 #roundTag{background:rgba(11,9,6,.72);border:1px solid rgba(224,138,46,.35);
   padding:.35em .8em;border-radius:6px;font-size:clamp(12px,1.8vw,15px);letter-spacing:.14em;
   text-transform:uppercase}
+#coinTag{background:rgba(11,9,6,.72);border:1px solid rgba(224,138,46,.35);color:var(--brass-glow);
+  padding:.35em .8em;border-radius:6px;font-size:clamp(12px,1.8vw,15px);letter-spacing:.1em;
+  align-self:flex-start;white-space:nowrap;transition:transform .2s}
+#coinTag.bump{transform:scale(1.15)}
 #myCard{pointer-events:auto;width:clamp(72px,11vw,104px);aspect-ratio:2/3;border-radius:8px;
   background-size:cover;background-position:center;border:1px solid rgba(224,138,46,.5);
   box-shadow:0 6px 22px rgba(0,0,0,.7);position:relative;cursor:pointer;
@@ -138,6 +142,7 @@ button{font-family:inherit;cursor:pointer}
 
 <div id="hud">
   <div id="roundTag"></div>
+  <div id="coinTag"></div>
   <div id="myCard" title=""><div class="face"><span class="lbl"></span><span class="word"></span><span class="hint"></span></div></div>
 </div>
 

@@ -13,7 +13,7 @@ export const ASSET_URLS = {
   char_widow: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/eca7c860-910f-4e08-acc1-b5cfee087784.glb",
   char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",
   table_tavern: "", // old table retired — using the new procedural poker-table design (makePokerTable in game.js) until a fresh GLB is hooked up here
-  revolver: "", // old revolver retired — using the new procedural revolver design (makeRevolverModel in game.js) until a fresh GLB is hooked up here
+  revolver: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/bafac26e-ea37-4b1d-9c01-eff43afd449c.glb", // the original real GLB — brought back, procedural version wasn't good enough
   ref_table: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070848_b5c9817c-c548-4b79-b5ca-0708a1f606a3.png", // reference photo for Meshy image-to-3D — run this through Meshy yourself, send back the .glb URL
   ref_revolver: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070849_d963749d-ba20-4cbe-b622-05cb9c8f5b7c.png", // reference photo for Meshy image-to-3D
   ref_bartender: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070844_a28fc51a-6d58-4488-bc91-35dce5fcd390.png", // reference photo for Meshy image-to-3D

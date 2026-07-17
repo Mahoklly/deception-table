@@ -104,6 +104,7 @@ function applyStaticStrings(){
   document.getElementById("settingsLanguageLabel").textContent = STR.settings_language_label;
   document.getElementById("closeSettingsBtn").textContent = STR.settings_close;
   if(!worldReady) document.getElementById("loadNote").textContent = STR.loading;
+  updateCoinTag();
 }
 const langEnBtn = document.getElementById("langEnBtn");
 const langKuBtn = document.getElementById("langKuBtn");
@@ -678,45 +679,132 @@ function makeActorShell(seatIdx){
    inlay, brass rivets around the edge, wrought-iron banded pedestal leg —
    used until/unless a Meshy-generated table_tavern.glb is hooked up */
 function makePokerTableTopTex(){
-  const cv = document.createElement("canvas"); cv.width=512; cv.height=512;
+  const cv = document.createElement("canvas"); cv.width=1024; cv.height=1024;
   const cx = cv.getContext("2d");
-  cx.fillStyle = "#2a1a0e"; cx.fillRect(0,0,512,512);
-  cx.strokeStyle = "#1c1108"; cx.lineWidth = 2; cx.globalAlpha = 0.15;
-  for(let i=0;i<40;i++){ cx.beginPath(); cx.arc(256,256,60+i*5,0,Math.PI*2); cx.stroke(); }
+  const C = 512;
+  // dark wood rim with real grain streaks, not a flat color
+  const woodGrad = cx.createRadialGradient(C,C,300,C,C,512);
+  woodGrad.addColorStop(0,"#33210f"); woodGrad.addColorStop(1,"#1c1108");
+  cx.fillStyle = woodGrad; cx.fillRect(0,0,1024,1024);
+  cx.globalAlpha = 0.18;
+  for(let i=0;i<70;i++){
+    cx.strokeStyle = i%3===0 ? "#0d0704" : "#40280f";
+    cx.lineWidth = 1+rng()*1.5;
+    cx.beginPath(); cx.arc(C,C,120+i*5.6,0,Math.PI*2); cx.stroke();
+  }
   cx.globalAlpha = 1;
-  const feltR = 200;
-  const grad = cx.createRadialGradient(256,256,10,256,256,feltR);
-  grad.addColorStop(0,"#1f5c34"); grad.addColorStop(1,"#123c22");
-  cx.fillStyle = grad; cx.beginPath(); cx.arc(256,256,feltR,0,Math.PI*2); cx.fill();
-  cx.strokeStyle = "#0d2415"; cx.lineWidth = 6;
-  cx.beginPath(); cx.arc(256,256,feltR,0,Math.PI*2); cx.stroke();
+  // felt: richer gradient, faint fabric weave, subtle center emblem
+  const feltR = 400;
+  const grad = cx.createRadialGradient(C,C,20,C,C,feltR);
+  grad.addColorStop(0,"#256b3c"); grad.addColorStop(0.75,"#1c522e"); grad.addColorStop(1,"#0f3a1f");
+  cx.fillStyle = grad; cx.beginPath(); cx.arc(C,C,feltR,0,Math.PI*2); cx.fill();
+  cx.globalAlpha = 0.05;
+  cx.strokeStyle = "#000";
+  for(let i=-feltR;i<feltR;i+=4){ cx.beginPath(); cx.moveTo(C-feltR,C+i); cx.lineTo(C+feltR,C+i); cx.stroke(); }
+  cx.globalAlpha = 1;
+  cx.strokeStyle = "#0a2814"; cx.lineWidth = 14;
+  cx.beginPath(); cx.arc(C,C,feltR,0,Math.PI*2); cx.stroke();
+  cx.strokeStyle = "rgba(224,178,110,.55)"; cx.lineWidth = 3;
+  cx.beginPath(); cx.arc(C,C,feltR-22,0,Math.PI*2); cx.stroke();
+  // faint suit emblem dead center — the "cool" detail
+  cx.globalAlpha = 0.16; cx.fillStyle = "#e0b26e";
+  cx.beginPath();
+  cx.arc(C-18,C-10,20,0,Math.PI*2); cx.arc(C+18,C-10,20,0,Math.PI*2);
+  cx.moveTo(C-36,C+4); cx.lineTo(C,C+46); cx.lineTo(C+36,C+4); cx.fill();
+  cx.globalAlpha = 1;
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+function makeWoodGrainTex(base, dark){
+  const cv = document.createElement("canvas"); cv.width=256; cv.height=256;
+  const cx = cv.getContext("2d");
+  cx.fillStyle = base; cx.fillRect(0,0,256,256);
+  cx.globalAlpha = 0.25;
+  for(let i=0;i<40;i++){
+    cx.strokeStyle = dark; cx.lineWidth = 1+rng()*2;
+    const y = rng()*256;
+    cx.beginPath(); cx.moveTo(0,y); cx.bezierCurveTo(80,y+rng()*10-5,160,y+rng()*10-5,256,y); cx.stroke();
+  }
+  cx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1,3);
   return tex;
 }
 function makePokerTable(){
   const t = new THREE.Group();
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,0.09,32),
-    new THREE.MeshStandardMaterial({map: makePokerTableTopTex(), roughness:0.75}));
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,0.09,64),
+    new THREE.MeshStandardMaterial({map: makePokerTableTopTex(), roughness:0.7}));
   top.position.y = 0.92; t.add(top);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.05,0.035,8,32),
-    new THREE.MeshStandardMaterial({color:0x1c1108, roughness:0.6}));
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.05,0.038,12,64),
+    new THREE.MeshPhysicalMaterial({map: makeWoodGrainTex("#2a190c","#160d05"), roughness:0.32, clearcoat:0.5, clearcoatRoughness:0.3}));
   rim.rotation.x = Math.PI/2; rim.position.y = 0.94; t.add(rim);
-  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.35, metalness:0.75});
-  for(let i=0;i<16;i++){
-    const a = (Math.PI*2/16)*i;
-    const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.018,8,6), brass);
-    rivet.position.set(Math.sin(a)*1.02, 0.955, Math.cos(a)*1.02);
+  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.28, metalness:0.85});
+  for(let i=0;i<24;i++){
+    const a = (Math.PI*2/24)*i;
+    const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.017,10,8), brass);
+    rivet.position.set(Math.sin(a)*1.02, 0.958, Math.cos(a)*1.02);
     t.add(rivet);
   }
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,0.92,10),
-    new THREE.MeshStandardMaterial({color:0x2a1d10, roughness:0.9}));
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,0.92,20),
+    new THREE.MeshStandardMaterial({map: makeWoodGrainTex("#231708","#120b04"), roughness:0.75}));
   leg.position.y = 0.46; t.add(leg);
-  const iron = new THREE.MeshStandardMaterial({color:0x1c1c1e, roughness:0.4, metalness:0.7});
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.03,20),
+    new THREE.MeshStandardMaterial({color:0x1c1108, roughness:0.8}));
+  foot.position.y = 0.015; t.add(foot);
+  const iron = new THREE.MeshStandardMaterial({color:0x1c1c1e, roughness:0.35, metalness:0.75});
   for(const hy of [0.18, 0.72]){
-    const band = new THREE.Mesh(new THREE.TorusGeometry(0.165,0.018,6,20), iron);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.165,0.018,8,24), iron);
     band.rotation.x = Math.PI/2; band.position.y = hy; t.add(band);
   }
   return t;
+}
+/* revolver case: a fitted, felt-lined tray sitting on the felt — the
+   revolver rests flat on top of it (never propped up) until it's drawn */
+function makeRevolverCase(){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.03,0.2),
+    new THREE.MeshStandardMaterial({map: makeWoodGrainTex("#1c1108","#0d0703"), roughness:0.6}));
+  base.position.y = 0.015; g.add(base);
+  const liner = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.016,0.15),
+    new THREE.MeshStandardMaterial({color:0x3a1016, roughness:0.9}));
+  liner.position.y = 0.03+0.008; g.add(liner);
+  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.3, metalness:0.8});
+  for(const [w,h,x,z] of [[0.4,0.012,0,0.098],[0.4,0.012,0,-0.098],[0.012,0.012,0.198,0],[0.012,0.012,-0.198,0]]){
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(w,0.014,h), brass);
+    edge.position.set(x,0.03,z); g.add(edge);
+  }
+  return g;
+}
+/* card case: a wooden deck box with its lid set aside and a loose, slightly
+   fanned stack of face-down cards spilling out — the "there's a deck here"
+   flourish. Built after cardBackTex loads so the stack shares the same
+   card-back photo as the dealt cards. */
+function makeCardCase(){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({map: makeWoodGrainTex("#241708","#120b04"), roughness:0.65});
+  const brass = new THREE.MeshStandardMaterial({color:0x9a7a30, roughness:0.3, metalness:0.8});
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.03,0.145), wood);
+  base.position.y = 0.015; g.add(base);
+  for(const [x,z] of [[-0.075,0.055],[0.075,0.055],[-0.075,-0.055],[0.075,-0.055]]){
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.011,0.007,8), brass);
+    foot.position.set(x,0.004,z); g.add(foot);
+  }
+  const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.022,0.016,0.018), brass);
+  clasp.position.set(0.09,0.03,0); g.add(clasp);
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.195,0.014,0.15), wood);
+  lid.position.set(-0.16, 0.007, 0.02); lid.rotation.y = 0.35; g.add(lid);
+  if(cardBackTex){
+    for(let i=0;i<7;i++){
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15,0.22),
+        new THREE.MeshStandardMaterial({map:cardBackTex, side:THREE.DoubleSide, roughness:0.7}));
+      m.rotation.x = -Math.PI/2;
+      m.rotation.z = (rng()-0.5)*0.45;
+      m.position.set((rng()-0.5)*0.025, 0.031+i*0.0035, (rng()-0.5)*0.02);
+      g.add(m);
+    }
+  }
+  return g;
 }
 /* real-geometry western revolver: barrel, cylinder drum, frame, wood grip,
    hammer and trigger guard — used until a Meshy-generated revolver.glb
@@ -823,6 +911,14 @@ scene.add(ch);
 }
   actors[0] = { seat:0, group:null, alive:true, npc:null }; // the player
 
+  // a felt-lined case for the revolver to rest flat in until it's drawn —
+  // attached to `table` so the raycast below lands on its liner, not the bare felt
+  {
+    const revCase = makeRevolverCase();
+    revCase.position.set(revolverHome.x, tableTopY, revolverHome.z);
+    table.add(revCase);
+    enableShadow(revCase);
+  }
   const gunMesh = gGun ? normalize(gGun, 0.2) : makeRevolverModel();
   revolver = new THREE.Group(); revolver.add(gunMesh);
   enableShadow(revolver);
@@ -845,6 +941,15 @@ scene.add(ch);
     revolverHome.copy(revolver.position);
   }
   buildTableCards();
+  // deck case with a loose stack of cards, sitting in the empty quadrant
+  // opposite the revolver — purely decorative, needs cardBackTex from
+  // buildTableCards() just above
+  {
+    const cardCase = makeCardCase();
+    cardCase.position.set(-0.3, tableTopY, 0.18);
+    table.add(cardCase);
+    enableShadow(cardCase);
+  }
   worldReady = true;
 }
 
@@ -902,6 +1007,25 @@ const G = {
   usedWords:new Set(), spoken:[[],[],[],[]], suspicion:null, heat:[0,0,0,0],
   heardCrewWords:0, voteCalled:false, extraRound:false, over:false,
 };
+
+/* ---------------- casino coins: a small meta-reward for actually winning ----
+   Persisted in localStorage so it survives reloads/new matches. Only the
+   two outcomes where the PLAYER wins pay out — win_imp means the imposter
+   (an NPC) won over a crew player, which is a loss for them, not a win. */
+const COIN_AWARDS = { win_crew:10, win_you_imp:20 };
+let coins = 0;
+try{ coins = parseInt(localStorage.getItem("coins"),10) || 0; }catch(e){}
+function updateCoinTag(){ const t=$("coinTag"); if(t) t.textContent = fmt(STR.coin_tag,{n:coins}); }
+function awardCoins(kind){
+  const n = COIN_AWARDS[kind] || 0;
+  if(n <= 0) return 0;
+  coins += n;
+  try{ localStorage.setItem("coins", String(coins)); }catch(e){}
+  updateCoinTag();
+  const t = $("coinTag");
+  if(t){ t.classList.add("bump"); setTimeout(()=>t.classList.remove("bump"), 260); }
+  return n;
+}
 const aliveSeats = ()=> [0,1,2,3].filter(i=>actors[i] && actors[i].alive);
 const npcName = npc => getLang()==="ku" ? npc.name_ku : npc.name;
 const nameOf = i => i===0 ? STR.you : npcName(actors[i].npc);
@@ -1475,7 +1599,9 @@ function endMatch(kind){
     lose_shot:[STR.lose_you_shot_title,STR.lose_you_shot_body],
     lose_imp:[STR.lose_you_imp_title,STR.lose_you_imp_body],
   };
-  h.innerHTML=map[kind][0]; p.textContent=fmt(map[kind][1],vars);
+  h.innerHTML=map[kind][0];
+  const earned = awardCoins(kind);
+  p.textContent = fmt(map[kind][1],vars) + (earned ? "  " + fmt(STR.coins_earned,{n:earned}) : "");
   $("startBtn").textContent=STR.play_again;
   $("loadNote").textContent="";
   t.classList.remove("hidden");

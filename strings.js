@@ -69,6 +69,8 @@ en: {
   prompt_proved_innocent_npc: "{n} proved their innocence.",
   banner_proved_imposter_npc: "❌ {n} is the IMPOSTER! They die.",
   prompt_proved_failed_npc: "{n} failed to prove their innocence.",
+  coin_tag: "🪙 {n}",
+  coins_earned: "+{n} coins",
 },
 ku: {
   title_blurb: "سێیان لەنێوان ئێوەدا نهێنیەکی هاوبەشیان هەیە. یەکێکتان تەنها ئاماژەیەکی هەیە. هەر خولێک وشەیەک بڵێ — بەقەد پێویست شاراوە بۆ پاراستنی نهێنییەکە، بەقەد پێویست ڕوون بۆ سەلماندنی زانینت. پاشان دەنگ بدە. تفەنگەکە پاشماوەکە چارەسەر دەکات.",
@@ -132,6 +134,8 @@ ku: {
   prompt_proved_innocent_npc: "{n} بێتاوانی خۆی سەلماند.",
   banner_proved_imposter_npc: "❌ {n} ساختەکارە! دەمرێت.",
   prompt_proved_failed_npc: "{n} نەیتوانی بێتاوانی خۆی بسەلمێنێت.",
+  coin_tag: "🪙 {n}",
+  coins_earned: "+{n} دراو",
 },
 };
 
