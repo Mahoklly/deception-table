@@ -1154,8 +1154,8 @@ let coins = 1000;
 try{ coins = parseInt(localStorage.getItem("coins"),10) || 0; }catch(e){}
 function updateCoinTag(){ const t=$("coinTag"); if(t) t.textContent = fmt(STR.coin_tag,{n:coins}); }
 function bankTableResult(){
-  const net = chipCounts[0] - STARTING_STAKE;
-  coins = Math.max(0, coins + net);
+  const net = chipCounts[80] - STARTING_STAKE;
+  coins = Math.max(80, coins + net);
   try{ localStorage.setItem("coins", String(coins)); }catch(e){}
   updateCoinTag();
   const t = $("coinTag");
