@@ -12,6 +12,8 @@ export const ASSET_URLS = {
   char_brute: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/d134ef7d-8897-429d-ba67-8a2ca0ea9484.glb",
   char_widow: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/eca7c860-910f-4e08-acc1-b5cfee087784.glb",
   char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",
+  char_hawk: "", // Full House mode's 4th NPC (Deacon Rourke) — drop a Meshy-generated char_hawk.glb URL here; falls back to a procedural placeholder capsule until then
+  char_crow: "", // Full House mode's 5th NPC (Old Ma Kessler) — same deal, drop a char_crow.glb URL here
   table_tavern: "", // old table retired — using the new procedural poker-table design (makePokerTable in game.js) until a fresh GLB is hooked up here
   revolver: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/bafac26e-ea37-4b1d-9c01-eff43afd449c.glb", // the original real GLB — brought back, procedural version wasn't good enough
   ref_table: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070848_b5c9817c-c548-4b79-b5ca-0708a1f606a3.png", // reference photo for Meshy image-to-3D — run this through Meshy yourself, send back the .glb URL

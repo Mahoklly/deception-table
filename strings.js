@@ -89,6 +89,11 @@ en: {
   shop_owned: "Owned",
   shop_equipped: "Equipped",
   shop_close: "Close",
+  settings_mode_label: "🪑 Table Size",
+  mode_classic: "Classic (4)",
+  mode_fullhouse: "Full House (6)",
+  mode_change_note: "Changing this reloads the game",
+  buy_clue: "Buy a Clue — {n} chips",
 },
 ku: {
   title_blurb: "سێیان لەنێوان ئێوەدا نهێنیەکی هاوبەشیان هەیە. یەکێکتان تەنها ئاماژەیەکی هەیە. هەر خولێک وشەیەک بڵێ — بەقەد پێویست شاراوە بۆ پاراستنی نهێنییەکە، بەقەد پێویست ڕوون بۆ سەلماندنی زانینت. پاشان دەنگ بدە. تفەنگەکە پاشماوەکە چارەسەر دەکات.",
@@ -172,6 +177,11 @@ ku: {
   shop_owned: "هی تۆیە",
   shop_equipped: "بەکارهاتوو",
   shop_close: "داخستن",
+  settings_mode_label: "🪑 قەبارەی خشتە",
+  mode_classic: "کلاسیک (٤)",
+  mode_fullhouse: "خشتەی پڕ (٦)",
+  mode_change_note: "گۆڕینی ئەمە یاریەکە دووبارە بار دەکاتەوە",
+  buy_clue: "ئاماژەیەک بکڕە — {n} چیپ",
 },
 };
 

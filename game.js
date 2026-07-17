@@ -152,6 +152,9 @@ function applyStaticStrings(){
   document.getElementById("settingsVolumeLabel").textContent = STR.settings_volume_label;
   document.getElementById("settingsLanguageLabel").textContent = STR.settings_language_label;
   document.getElementById("closeSettingsBtn").textContent = STR.settings_close;
+  document.getElementById("settingsModeLabel").textContent = STR.settings_mode_label;
+  document.getElementById("modeClassicBtn").textContent = STR.mode_classic;
+  document.getElementById("modeFullBtn").textContent = STR.mode_fullhouse;
   if(!worldReady) document.getElementById("loadNote").textContent = STR.loading;
   updateCoinTag();
   if(shopOpen) renderShop();
@@ -172,7 +175,7 @@ function changeLang(l){
   applyStaticStrings();
   // nameplates are cached DOM elements — retext them in place, they won't
   // otherwise pick up the swap until they're first created
-  for(const i of [1,2,3]){
+  for(let i=1;i<SEAT_COUNT;i++){
     const p = plateEls[i];
     if(p && actors[i] && actors[i].npc) p.querySelector(".nm").textContent = npcName(actors[i].npc);
   }
@@ -180,6 +183,29 @@ function changeLang(l){
 langEnBtn.addEventListener("click", ()=>changeLang("en"));
 langKuBtn.addEventListener("click", ()=>changeLang("ku"));
 updateLangButtons();
+
+/* ---------------- game mode (Classic 4-seat vs Full House 6-seat) ----------
+   Reshapes the whole scene (seat layout, table scale, NPC roster), so unlike
+   language this isn't a live swap — picking a different mode reloads. */
+const modeClassicBtn = document.getElementById("modeClassicBtn");
+const modeFullBtn = document.getElementById("modeFullBtn");
+function currentMode(){ try{ return localStorage.getItem("game_mode")==="fullhouse" ? "fullhouse" : "classic"; }catch(e){ return "classic"; } }
+function updateModeButtons(){
+  const m = currentMode();
+  modeClassicBtn.style.background = m==="classic" ? "#7a2e22" : "#2a1d10";
+  modeClassicBtn.style.color      = m==="classic" ? "#efe3c0" : "#c6b184";
+  modeFullBtn.style.background    = m==="fullhouse" ? "#7a2e22" : "#2a1d10";
+  modeFullBtn.style.color         = m==="fullhouse" ? "#efe3c0" : "#c6b184";
+}
+function changeMode(m){
+  if(m===currentMode()) return;
+  if(!confirm(STR.mode_change_note)) return;
+  try{ localStorage.setItem("game_mode", m); }catch(e){}
+  location.reload();
+}
+modeClassicBtn.addEventListener("click", ()=>changeMode("classic"));
+modeFullBtn.addEventListener("click", ()=>changeMode("fullhouse"));
+updateModeButtons();
 
 addEventListener("pointerdown", unlockAudio, {once:false});
 
@@ -635,14 +661,35 @@ function buildRoadhouseBar(){
 }
 buildRoadhouseBar();
 
+/* ---------------- game mode: how many chairs at the table ----------------
+   Classic = you + 3 NPCs (the original, tightly-tuned layout). Full House =
+   you + 5 NPCs on a bigger table. Persisted in localStorage; switching modes
+   reloads the page since it reshapes the whole scene, not just UI text. */
+function initialSeatCount(){
+  try{ return localStorage.getItem("game_mode")==="fullhouse" ? 6 : 4; }catch(e){ return 4; }
+}
+const SEAT_COUNT = initialSeatCount();
+const ALL_SEATS = Array.from({length:SEAT_COUNT}, (_,i)=>i);
+
 /* ---------------- seats & actors ---------------- */
-// Seat 0 = player (camera). 1=left, 2=front, 3=right.
-const SEATS = [
-  { pos:new THREE.Vector3(0,0, 1.55),     rotY: Math.PI },
-  { pos:new THREE.Vector3(-1.18,0,-0.42), rotY: Math.atan2(1.18, 0.42) },
-  { pos:new THREE.Vector3(0,0,-1.5),      rotY: 0 },
-  { pos:new THREE.Vector3(1.18,0,-0.42),  rotY: -Math.atan2(1.18, 0.42) },
+// Seat 0 = player (camera). Rest are NPCs, arranged so every seat stays
+// inside the reachable mouse-look cone (yaw ±0.85rad + half the camera FOV).
+function seatAt(x,z){ return { pos:new THREE.Vector3(x,0,z), rotY: Math.atan2(-x,-z) }; }
+const SEATS_CLASSIC = [
+  seatAt(0, 1.55),
+  seatAt(-1.18, -0.42),
+  seatAt(0, -1.5),
+  seatAt(1.18, -0.42),
 ];
+const SEATS_FULLHOUSE = [
+  seatAt(0, 1.7),
+  seatAt(1.503, -0.547),
+  seatAt(0.918, -1.311),
+  seatAt(0, -1.6),
+  seatAt(-0.918, -1.311),
+  seatAt(-1.503, -0.547),
+];
+const SEATS = SEAT_COUNT===6 ? SEATS_FULLHOUSE : SEATS_CLASSIC;
 const loader = new GLTFLoader();
 function loadGLB(key, file){ return new Promise(res=>loader.load(assetSrc(key,file), g=>res(g.scene), undefined, ()=>res(null))); }
 function normalize(obj, targetH, groundY=0){
@@ -788,21 +835,21 @@ const SHOP_CATALOG = {
   felt: [
     { id:"classic", name:"Classic Green", price:0,   a:"#256b3c", b:"#1c522e", c:"#0f3a1f", edge:"#0a2814" },
     { id:"oxblood", name:"Oxblood",        price:80,  a:"#7a2e22", b:"#5c2018", c:"#38130d", edge:"#210b07" },
-    { id:"royal",   name:"Royal Blue",     price:120,  a:"#204d78", b:"#173a5c", c:"#0d2338", edge:"#081627" },
-    { id:"noir",    name:"Charcoal Noir",  price:160, a:"#3a3a3d", b:"#2a2a2c", c:"#161617", edge:"#0a0a0b" },
+    { id:"royal",   name:"Royal Blue",     price:80,  a:"#204d78", b:"#173a5c", c:"#0d2338", edge:"#081627" },
+    { id:"noir",    name:"Charcoal Noir",  price:120, a:"#3a3a3d", b:"#2a2a2c", c:"#161617", edge:"#0a0a0b" },
     { id:"gold",    name:"Gold Rush",      price:200, a:"#8a7226", b:"#6b5818", c:"#3d3009", edge:"#241c05" },
   ],
   chips: [
-    { id:"classic", name:"Classic",     price:80,   colors:[0xe9e2d0, 0xb9312a, 0x1f4fa0, 0x267a3e, 0x6b2f8a] },
-    { id:"neon",    name:"Neon Nights", price:120,  colors:[0x1affe0, 0xff2fd0, 0x2f6bff, 0xccff33, 0xff8a1f] },
-    { id:"noir",    name:"Noir",        price:160,  colors:[0xe6e6e6, 0xa0a0a0, 0x606060, 0x2c2c2c, 0x0e0e0e] },
-    { id:"gold",    name:"Gold Rush",   price:0, colors:[0xf1e0a8, 0xd4af37, 0xb08d3f, 0x6b5218, 0x2a2416] },
+    { id:"classic", name:"Classic",     price:0,   colors:[0xe9e2d0, 0xb9312a, 0x1f4fa0, 0x267a3e, 0x6b2f8a] },
+    { id:"neon",    name:"Neon Nights", price:80,  colors:[0x1affe0, 0xff2fd0, 0x2f6bff, 0xccff33, 0xff8a1f] },
+    { id:"noir",    name:"Noir",        price:80,  colors:[0xe6e6e6, 0xa0a0a0, 0x606060, 0x2c2c2c, 0x0e0e0e] },
+    { id:"gold",    name:"Gold Rush",   price:150, colors:[0xf1e0a8, 0xd4af37, 0xb08d3f, 0x6b5218, 0x2a2416] },
   ],
   trim: [
-    { id:"classic", name:"Brass",  price:80,   color:0x9a7a30 },
-    { id:"silver",  name:"Silver", price:120,  color:0xb8bec4 },
-    { id:"copper",  name:"Copper", price:160,  color:0xb5651d },
-    { id:"gold",    name:"Gold",   price:200, color:0xd4af37 },
+    { id:"classic", name:"Brass",  price:0,   color:0x9a7a30 },
+    { id:"silver",  name:"Silver", price:60,  color:0xb8bec4 },
+    { id:"copper",  name:"Copper", price:60,  color:0xb5651d },
+    { id:"gold",    name:"Gold",   price:150, color:0xd4af37 },
   ],
 };
 let shopOwned = { felt:["classic"], chips:["classic"], trim:["classic"] };
@@ -833,7 +880,7 @@ function applyTrimCosmetic(){
 }
 function applyChipCosmetic(){
   CHIP_PALETTE = equippedItem("chips").colors;
-  for(let i=0;i<4;i++) if(chipStacks[i]) rebuildChipStack(i);
+  for(let i=0;i<SEAT_COUNT;i++) if(chipStacks[i]) rebuildChipStack(i);
 }
 function buyOrEquip(cat, id){
   const item = SHOP_CATALOG[cat].find(i=>i.id===id);
@@ -886,8 +933,10 @@ function makeChip(hex){
   return chip;
 }
 const STARTING_STAKE = 30;
-const chipCounts = [0,0,0,0];
-const chipStacks = [null,null,null,null];
+const CLUE_COST = 8;
+let clueBought = new Array(SEAT_COUNT).fill(false);
+const chipCounts = new Array(SEAT_COUNT).fill(0);
+const chipStacks = new Array(SEAT_COUNT).fill(null);
 function chipSlotBase(seatIdx){
   const dir = SEATS[seatIdx].pos.clone().setY(0).normalize();
   const perp = new THREE.Vector3(-dir.z,0,dir.x);
@@ -916,7 +965,7 @@ function rebuildChipStack(seatIdx){
   chipStacks[seatIdx] = g;
 }
 function resetChipStakes(){
-  for(let i=0;i<4;i++){ chipCounts[i]=STARTING_STAKE; rebuildChipStack(i); }
+  for(let i=0;i<SEAT_COUNT;i++){ chipCounts[i]=STARTING_STAKE; rebuildChipStack(i); }
 }
 /* animate `amount` chips flying from one seat's stack to another's, then land */
 async function flyChips(fromSeat, toSeat, amount){
@@ -984,10 +1033,13 @@ let table=null, revolver=null, tableTopY=0.95, worldReady=false, cardBackTex=nul
 const cards=[];
 const revolverHome = new THREE.Vector3(0.28, 0, 0.15);
 async function loadWorld(){
-  const [gRoom, gTable, gBrute, gWidow, gFox, gGun, gBarShelf] = await Promise.all([
+  const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun, gBarShelf] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
     loadGLB("table_tavern","table_tavern.glb"), loadGLB("char_brute","char_brute.glb"),
-    loadGLB("char_widow","char_widow.glb"), loadGLB("char_fox","char_fox.glb"), loadGLB("revolver","revolver.glb"),
+    loadGLB("char_widow","char_widow.glb"), loadGLB("char_fox","char_fox.glb"),
+    SEAT_COUNT>4 ? loadGLB("char_hawk","char_hawk.glb") : Promise.resolve(null),
+    SEAT_COUNT>4 ? loadGLB("char_crow","char_crow.glb") : Promise.resolve(null),
+    loadGLB("revolver","revolver.glb"),
     loadGLB("room_bar_shelf","room_bar_shelf.glb"),
   ]);
   // swap the procedural box/beam room for a Higgsfield-generated one, if hooked up
@@ -1031,6 +1083,7 @@ async function loadWorld(){
     }
   }
   table = gTable ? normalize(gTable, 0.95) : makePokerTable();
+  if(SEAT_COUNT>4) table.scale.multiplyScalar(1.3); // Full House: bigger table for the extra chairs
   enableShadow(table);
   scene.add(table);
   // table top height for props
@@ -1039,8 +1092,8 @@ async function loadWorld(){
   revolverHome.y = tableTopY + 0.005;
   candle.position.y = tableTopY + 0.26;
 
-const models = [null, gBrute, gWidow, gFox];
-for(let i=1;i<4;i++){
+const models = [null, gBrute, gWidow, gFox, gHawk, gCrow];
+for(let i=1;i<SEAT_COUNT;i++){
   const a = makeActorShell(i);
   const npc = NPCS[i-1];
   a.npc = npc;
@@ -1140,7 +1193,7 @@ function flash(){ const f=$("flash"); f.style.transition="none"; f.style.opacity
 /* ---------------- game state ---------------- */
 const G = {
   phase:"title", card:null, imposterSeat:-1, round:1, maxRounds:RULES.maxRounds,
-  usedWords:new Set(), spoken:[[],[],[],[]], suspicion:null, heat:[0,0,0,0],
+  usedWords:new Set(), spoken:ALL_SEATS.map(()=>[]), suspicion:null, heat:new Array(SEAT_COUNT).fill(0),
   heardCrewWords:0, voteCalled:false, extraRound:false, over:false,
 };
 
@@ -1150,7 +1203,7 @@ const G = {
    chip-stack system above the revolver code) and physically win/lose
    chips off each other round by round as seats get shot. At match end
    whatever the player nets at the table — up or down — settles here. */
-let coins = 80;
+let coins = 0;
 try{ coins = parseInt(localStorage.getItem("coins"),10) || 0; }catch(e){}
 function updateCoinTag(){ const t=$("coinTag"); if(t) t.textContent = fmt(STR.coin_tag,{n:coins}); }
 function bankTableResult(){
@@ -1162,20 +1215,21 @@ function bankTableResult(){
   if(t){ t.classList.add("bump"); setTimeout(()=>t.classList.remove("bump"), 260); }
   return net;
 }
-const aliveSeats = ()=> [0,1,2,3].filter(i=>actors[i] && actors[i].alive);
+const aliveSeats = ()=> ALL_SEATS.filter(i=>actors[i] && actors[i].alive);
 const npcName = npc => getLang()==="ku" ? npc.name_ku : npc.name;
 const nameOf = i => i===0 ? STR.you : npcName(actors[i].npc);
 
 function newMatch(){
   G.card = pick(DECK[getLang()]);
-  G.imposterSeat = Math.floor(rng()*4);
+  G.imposterSeat = Math.floor(rng()*SEAT_COUNT);
   G.round = 1; G.maxRounds = RULES.maxRounds;
-  G.usedWords = new Set(); G.spoken=[[],[],[],[]];
-  G.heat=[0,0,0,0]; G.heardCrewWords=0; G.voteCalled=false; G.extraRound=false; G.over=false;
+  G.usedWords = new Set(); G.spoken=ALL_SEATS.map(()=>[]);
+  G.heat=new Array(SEAT_COUNT).fill(0); G.heardCrewWords=0; G.voteCalled=false; G.extraRound=false; G.over=false;
+  clueBought = new Array(SEAT_COUNT).fill(false);
   // per-observer suspicion matrix (crew NPCs only use their own row)
-  G.suspicion = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  G.suspicion = ALL_SEATS.map(()=>new Array(SEAT_COUNT).fill(0));
   for(const a of actors) if(a){ a.alive=true; a.slump=0; a.lean=0; }
-  for(const i of [1,2,3]){ const p=plateEls[i]; if(p){ p.classList.remove("dead"); p.querySelector(".sus").textContent=""; } }
+  for(let i=1;i<SEAT_COUNT;i++){ const p=plateEls[i]; if(p){ p.classList.remove("dead"); p.querySelector(".sus").textContent=""; } }
   // word map for scoring
   G.wordWeight = {};
   for(const w of G.card.obvious) G.wordWeight[w]=RULES.weights.obvious;
@@ -1204,9 +1258,23 @@ function imposterHand(){
     .map(w=>({w,tier:"bluff"}));
   return shuffle(learned.concat(b)).slice(0,RULES.handSize);
 }
+function npcShouldBuyClue(seat){
+  const npc = actors[seat].npc;
+  const isTopSuspect = G.heat[seat] >= Math.max(...aliveSeats().filter(s=>s!==seat).map(s=>G.heat[s]), 0);
+  const chance = (isTopSuspect ? 0.55 : 0.12) * (0.4 + npc.caution);
+  return rng() < chance;
+}
 function npcPickWord(seat){
   const a=actors[seat], npc=a.npc;
   if(seat===G.imposterSeat){
+    if(!clueBought[seat] && chipCounts[seat]>=CLUE_COST && npcShouldBuyClue(seat)){
+      const pool = unused(G.card.subtle.concat(G.card.medium));
+      if(pool.length){
+        clueBought[seat]=true;
+        chipCounts[seat]-=CLUE_COST; rebuildChipStack(seat);
+        return {w:pick(pool), tier:"bluff"};
+      }
+    }
     const hand=imposterHand();
     return hand[0] || {w:pick(G.card.bluff), tier:"bluff"};
   }
@@ -1274,6 +1342,7 @@ function offerHand(hand){
     });
     G._handResolver = k=>{ const h=hand[k]; if(h) done(h); };
     G._handCancel = ()=>done(null);
+    G._handInject = h=>done(h);
   });
 }
 function offerCallVote(){
@@ -1283,6 +1352,23 @@ function offerCallVote(){
     b.onclick=()=>{ G.voteCalled=true; act.innerHTML=""; if(G._handCancel) G._handCancel(); };
     act.appendChild(b);
   }
+}
+/* imposter-only: spend table chips for a guaranteed real word, on demand,
+   instead of waiting on the passive heardCrewWords-based unlock. Appends
+   to #actions without clearing it, so it can sit beside Call the Vote. */
+function offerClueButton(){
+  if(clueBought[0] || chipCounts[0] < CLUE_COST) return;
+  if(!unused(G.card.subtle.concat(G.card.medium)).length) return;
+  const act=$("actions");
+  const b=document.createElement("button"); b.className="ghostBtn"; b.textContent=fmt(STR.buy_clue,{n:CLUE_COST});
+  b.onclick=()=>{
+    const pool = unused(G.card.subtle.concat(G.card.medium));
+    if(clueBought[0] || chipCounts[0]<CLUE_COST || !pool.length) return;
+    clueBought[0]=true;
+    chipCounts[0]-=CLUE_COST; rebuildChipStack(0);
+    if(G._handInject) G._handInject({w:pick(pool), tier:"subtle"});
+  };
+  act.appendChild(b);
 }
 function offerVote(){
   return new Promise(res=>{
@@ -1587,7 +1673,7 @@ function cardFaceTexture(isImp){
 function buildTableCards(){
   const backTex = cardBackTex = texLoader.load(assetSrc("card_back","card_back.png"));
   backTex.colorSpace = THREE.SRGBColorSpace;
-  for(let i=0;i<4;i++){
+  for(let i=0;i<SEAT_COUNT;i++){
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15,0.22),
       new THREE.MeshStandardMaterial({map:backTex, side:THREE.DoubleSide, roughness:0.7}));
     const grp = new THREE.Group(); grp.add(m);
@@ -1629,7 +1715,7 @@ async function dealCardsSequence(){
   }
   setPrompt(STR.deal_prompt);
   // NPCs lift their cards to read them (faces tilted away from you)
-  const npcPeeks = [1,2,3].map(async (i, k)=>{
+  const npcPeeks = ALL_SEATS.slice(1).map(async (i, k)=>{
     await sleep(350*k + 250);
     const c=cards[i], seat=SEATS[i];
     const up = new THREE.Vector3(seat.pos.x*0.8, tableTopY+0.45, seat.pos.z*0.8);
@@ -1703,6 +1789,7 @@ async function runMatch(){
         setPrompt(STR.prompt_your_turn);
         offerCallVote();
         const isImp = G.imposterSeat===0;
+        if(isImp) offerClueButton();
         const h = await offerHand(isImp ? imposterHand() : crewHand());
         $("actions").innerHTML="";
         if(h){
@@ -1836,7 +1923,7 @@ function update(dt){
     if(c==="vote"){ const b=$("actions").querySelector("button"); if(b) b.click(); }
   }
   // actor idle / lean / glance / slump
-  for(let i=1;i<4;i++){
+  for(let i=1;i<SEAT_COUNT;i++){
     const a=actors[i]; if(!a||!a.inner) continue;
     a.breathe += dt*0.0016;
     const breatheAmt = a.alive ? Math.sin(a.breathe)*0.012 : 0;
@@ -1865,7 +1952,7 @@ function update(dt){
 function render(){
   renderer.render(scene, camera);
   // project bubbles + plates
-  for(const i of [0,1,2,3]){
+  for(const i of ALL_SEATS){
     const b=bubbleEls[i];
     if(b){
       if(+b.dataset.hideAt < clock.t) b.classList.remove("show");
