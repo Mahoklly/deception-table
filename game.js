@@ -329,10 +329,14 @@ candle.shadow.mapSize.set(1024,1024);
 candle.shadow.camera.near = 0.05; candle.shadow.camera.far = 12; candle.shadow.bias = -0.003;
 const lantern = new THREE.SpotLight(0xe08a2e, 65, 15, 0.7, 0.55, 1.7);
 lantern.position.set(0,3.4,0.4); lantern.target.position.set(0,0.9,-0.4); scene.add(lantern, lantern.target);
-lantern.castShadow = true;
-lantern.shadow.mapSize.set(1024,1024);
-lantern.shadow.camera.near = 0.3; lantern.shadow.camera.far = 14; lantern.shadow.bias = -0.0025;
+// no castShadow here on purpose: this light rakes across the table at a low
+// angle, so small props (the revolver) threw a second, badly-stretched
+// "rifle-like" shadow alongside the candle's — the candle alone (near-
+// overhead, close to the table) already casts the correct compact one.
 const rim = new THREE.DirectionalLight(0x5a3c22, 0.9); rim.position.set(-3,2.5,-4); scene.add(rim);
+/* ambient life without patrons: a slowly turning ceiling fan and a
+   realistically flickering neon sign — both set inside buildRoom() below */
+let ceilingFan = null, neonSignMat = null;
 /* generic helper: flag every mesh in a subtree to cast/receive real-time shadows */
 function enableShadow(obj, cast=true, recv=true){
   obj.traverse(m=>{ if(m.isMesh){ m.castShadow = cast; m.receiveShadow = recv; } });
@@ -424,6 +428,26 @@ function buildRoom(){
     beam.rotation.y = (Math.PI/6)*i;
     g.add(beam);
   }
+  // old ceiling fan, slowly turning — cheap ambient motion overhead so the
+  // room doesn't feel frozen, without putting any more people in it
+  {
+    const fan = new THREE.Group();
+    const ironMat = new THREE.MeshStandardMaterial({color:0x1c1c1e, roughness:0.4, metalness:0.7});
+    const bladeMat = new THREE.MeshStandardMaterial({color:0x2a1c10, roughness:0.7});
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.4,8), ironMat);
+    rod.position.y = 0.2; fan.add(rod);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.1,12), ironMat);
+    fan.add(hub);
+    for(let i=0;i<4;i++){
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.02,0.16), bladeMat);
+      blade.position.x = 0.5;
+      const holder = new THREE.Group(); holder.add(blade); holder.rotation.y = (Math.PI/2)*i;
+      fan.add(holder);
+    }
+    fan.position.set(0, WALL_H-0.24, 0);
+    g.add(fan);
+    ceilingFan = fan;
+  }
   // small brass wall lamps — dome shade + warm bulb, reclaimed-industrial
   // touch instead of neon; each throws its own soft amber pool on the wood
   for(const ang of [segAngle*1.5, segAngle*3.5, segAngle*6.5, segAngle*8.5]){
@@ -446,10 +470,15 @@ function buildRoom(){
     const signMat = new THREE.MeshStandardMaterial({color:0x0a0705, roughness:0.6, emissive:0x000000});
     applyOnceTex(signMat, "tex_neon_bar","tex_neon_bar.jpg");
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.1), signMat);
-    const sp = wallPoint(BAR_ANGLE, 0.14);
+    // the wall segments are 0.28 thick, centered on the room radius, so
+    // their inner face sits at ROOM_R-0.14 — mounting the sign at exactly
+    // that same radius put it perfectly coplanar with the wall (z-fighting,
+    // the flicker). 0.22 clears the wall face with real, visible standoff.
+    const sp = wallPoint(BAR_ANGLE, 0.22);
     sign.position.set(sp.x, 3.4, sp.z);
     sign.rotation.y = BAR_ANGLE + Math.PI;
     g.add(sign);
+    neonSignMat = signMat;
   }
   scene.add(g);
   enableShadow(g);
@@ -507,7 +536,12 @@ function buildRoadhouseBar(){
     const art = new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat);
     art.position.set(p.x, y, p.z); art.rotation.y = ang + Math.PI;
     g.add(art);
-    for(const [fw,fh,fx,fy] of [[w+0.08,0.05,0,h/2+0.02],[w+0.08,0.05,0,-h/2-0.02],[0.05,h,-w/2-0.02,0],[0.05,h,w/2+0.02,0]]){
+    // top/bottom bars overhang the artwork's width by 0.08, but the
+    // left/right bars were only as tall as the artwork itself — short of
+    // the top/bottom bars' true extent, leaving a visible gap at every
+    // corner instead of a fully closed frame. Matching overhang on all
+    // four bars closes it.
+    for(const [fw,fh,fx,fy] of [[w+0.08,0.05,0,h/2+0.02],[w+0.08,0.05,0,-h/2-0.02],[0.05,h+0.08,-w/2-0.02,0],[0.05,h+0.08,w/2+0.02,0]]){
       const bar = new THREE.Mesh(new THREE.BoxGeometry(fw,fh,0.04), steel);
       bar.position.set(fx,fy,0.01);
       art.add(bar);
@@ -1005,6 +1039,7 @@ function makeChip(hex){
 const STARTING_STAKE = 30;
 const CLUE_COST = 8;
 let clueBought = new Array(SEAT_COUNT).fill(false);
+let betPileChips = []; // the side bet's chips currently sitting in the middle of the table, if any
 const chipCounts = new Array(SEAT_COUNT).fill(0);
 const chipStacks = new Array(SEAT_COUNT).fill(null);
 function chipSlotBase(seatIdx){
@@ -1037,14 +1072,17 @@ function rebuildChipStack(seatIdx){
 function resetChipStakes(){
   for(let i=0;i<SEAT_COUNT;i++){ chipCounts[i]=STARTING_STAKE; rebuildChipStack(i); }
 }
-/* animate `amount` chips flying from one seat's stack to another's, then land */
-async function flyChips(fromSeat, toSeat, amount){
-  if(amount<=0) return;
-  const fromBase = chipSlotBase(fromSeat), toBase = chipSlotBase(toSeat);
+function tableCenterPos(){ return new THREE.Vector3(0, tableTopY+0.012, 0); }
+/* animate `amount` chips flying between two world positions; returns the
+   flyer meshes still parked at `toPos` so a caller can hold them there
+   (e.g. a bet's pot pile) instead of always cleaning them up immediately */
+async function flyChipsBetween(fromPos, toPos, amount, colorOffset=0){
+  if(amount<=0) return [];
   const flyers=[];
   for(let k=0;k<amount;k++){
-    const chip = makeChip(CHIP_PALETTE[k%CHIP_PALETTE.length]);
-    chip.position.copy(fromBase); chip.position.y += 0.02 + k*0.003;
+    const chip = makeChip(CHIP_PALETTE[(k+colorOffset)%CHIP_PALETTE.length]);
+    chip.position.copy(fromPos); chip.position.y += 0.02 + k*0.003;
+    chip.rotation.y = rng()*6.28;
     scene.add(chip); flyers.push(chip);
   }
   const steps=26;
@@ -1054,12 +1092,50 @@ async function flyChips(fromSeat, toSeat, amount){
       const delay=k*0.05;
       const lt=Math.max(0,Math.min(1,(t-delay)/(1-delay+0.0001)));
       const e=lt*lt*(3-2*lt);
-      flyers[k].position.lerpVectors(fromBase,toBase,e);
+      flyers[k].position.lerpVectors(fromPos,toPos,e);
       flyers[k].position.y += Math.sin(e*Math.PI)*0.16;
       flyers[k].rotation.x += 0.3;
     }
     await sleep(16);
   }
+  return flyers;
+}
+/* animate already-existing chip meshes (e.g. a bet's pot pile) on to a new
+   world position, then remove them — used instead of flyChipsBetween when
+   the chips are already sitting on the table rather than starting fresh */
+async function flyExistingTo(meshes, toPos){
+  if(!meshes || !meshes.length) return;
+  const froms = meshes.map(c=>c.position.clone());
+  const steps=26;
+  for(let s=1;s<=steps;s++){
+    const t=s/steps;
+    for(let k=0;k<meshes.length;k++){
+      const delay=k*0.05;
+      const lt=Math.max(0,Math.min(1,(t-delay)/(1-delay+0.0001)));
+      const e=lt*lt*(3-2*lt);
+      meshes[k].position.lerpVectors(froms[k], toPos, e);
+      meshes[k].position.y += Math.sin(e*Math.PI)*0.16;
+      meshes[k].rotation.x += 0.3;
+    }
+    await sleep(16);
+  }
+  for(const c of meshes) scene.remove(c);
+}
+/* shrink chips down into the felt and remove them — the "swept away" look
+   for a lost bet, rather than flying them anywhere in particular */
+async function sweepAwayChips(pile){
+  if(!pile || !pile.length) return;
+  const steps=20;
+  for(let s=1;s<=steps;s++){
+    const t=s/steps, e=t*t;
+    for(const c of pile){ c.position.y -= 0.016*e; c.scale.setScalar(Math.max(0.001,1-e)); }
+    await sleep(16);
+  }
+  for(const c of pile) scene.remove(c);
+}
+/* animate `amount` chips flying from one seat's stack to another's, then land */
+async function flyChips(fromSeat, toSeat, amount){
+  const flyers = await flyChipsBetween(chipSlotBase(fromSeat), chipSlotBase(toSeat), amount);
   for(const c of flyers) scene.remove(c);
 }
 /* a seat just lost the gun draw — they forfeit half their stake (min 4),
@@ -1496,7 +1572,12 @@ function offerBet(){
         if(amt < MIN_STAKE || seen.has(amt)) continue;
         seen.add(amt);
         const b=document.createElement("button"); b.className="ghostBtn"; b.textContent=fmt(lbl,{n:amt});
-        b.onclick=()=>finish({seat, amount:amt, aliveCount:alive.length});
+        b.onclick=()=>{
+          const pileCount = Math.min(14, Math.max(2, Math.round(amt/5)));
+          play("click");
+          flyChipsBetween(chipSlotBase(0), tableCenterPos(), pileCount).then(flyers=>{ betPileChips = flyers; });
+          finish({seat, amount:amt, aliveCount:alive.length, pileCount});
+        };
         stakeWrap.appendChild(b);
       }
       row.appendChild(stakeWrap);
@@ -1505,17 +1586,29 @@ function offerBet(){
 }
 function resolveBet(bet, victim, died){
   if(!bet) return;
-  if(!died){ setBanner(STR.bet_push, 1800); return; }
+  const pile = betPileChips; betPileChips = [];
+  if(!died){
+    play("click");
+    flyExistingTo(pile, chipSlotBase(0));
+    setBanner(STR.bet_push, 1800);
+    return;
+  }
   if(victim===bet.seat){
     const profit = bet.amount * (bet.aliveCount - 1);
     coins += profit;
     try{ localStorage.setItem("coins", String(coins)); }catch(e){}
     updateCoinTag();
+    play("click");
+    flyExistingTo(pile, chipSlotBase(0));
+    const bonus = Math.min(10, Math.max(0, Math.round(profit/10) - pile.length));
+    if(bonus>0) flyChipsBetween(tableCenterPos(), chipSlotBase(0), bonus).then(flyers=>{ for(const c of flyers) scene.remove(c); });
     setBanner(fmt(STR.bet_win,{a:profit}), 2000);
   } else {
     coins = Math.max(0, coins - bet.amount);
     try{ localStorage.setItem("coins", String(coins)); }catch(e){}
     updateCoinTag();
+    play("click");
+    sweepAwayChips(pile);
     setBanner(fmt(STR.bet_lose,{a:bet.amount}), 2000);
   }
 }
@@ -1538,13 +1631,20 @@ function glanceAt(observer, target){
   a.glanceDir = Math.atan2(dx,dz) - a.group.rotation.y;
   a.glance = 1;
 }
+// the source GLB's barrel is modeled facing the opposite way from this
+// yaw convention (0 rad = +Z, matching every seat's rotY elsewhere in the
+// file) — without this offset the muzzle aims exactly backward, most
+// obvious when the target is the player (straight-ahead, yaw 0) since
+// "pointing the wrong way" there means pointing directly away from you.
+// If it's ever still wrong, this is the one constant to flip (try 0).
+const GUN_YAW_OFFSET = Math.PI;
 async function executeSeat(victim){
   play("drum");
   // revolver rises and aims
   const target = victim===0 ? new THREE.Vector3(0,1.25,1.3) : SEATS[victim].pos.clone().setY(1.25);
   const up = new THREE.Vector3(0, revolverHome.y+0.55, 0);
-  const aimYaw = Math.atan2(target.x - up.x, target.z - up.z);
-  const aimPitch = -Math.atan2(target.y - up.y, Math.hypot(target.x-up.x, target.z-up.z));
+  const aimYaw = Math.atan2(target.x - up.x, target.z - up.z) + GUN_YAW_OFFSET;
+  const aimPitch = Math.atan2(target.y - up.y, Math.hypot(target.x-up.x, target.z-up.z));
   await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 1000); // slow level lift
   await tweenTo(revolver, up, {x:aimPitch, y:aimYaw, z:0}, 700);        // swing onto the target
   await sleep(900);                                                      // the dramatic pause
@@ -2010,6 +2110,13 @@ function update(dt){
   }
   // candle flicker
   candle.intensity = 3.4 + Math.sin(clock.t*0.011)*0.3 + Math.sin(clock.t*0.037)*0.2;
+  // ambient life: the ceiling fan turns lazily, the neon sign mostly holds
+  // steady but occasionally stutters like a real tube running low
+  if(ceilingFan) ceilingFan.rotation.y += dt*0.0011;
+  if(neonSignMat){
+    const stutter = (Math.sin(clock.t*0.0027)>0.982) ? 0.15+rng()*0.3 : 1;
+    neonSignMat.emissiveIntensity = stutter;
+  }
   // fixed camera with smooth mouse-look
   camYaw += (camYawT - camYaw)*0.07;
   camPitch += (camPitchT - camPitch)*0.07;
