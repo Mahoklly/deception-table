@@ -378,6 +378,44 @@ function applyOnceTex(material, key, file, glow=1){
     material.needsUpdate = true;
   }, undefined, ()=>{ /* keep the flat dark fallback plaque */ });
 }
+/* like applyOnceTex, but for photos with a dark background around the
+   glowing subject (a neon sign shot at night) that would otherwise show
+   up as a flat dark rectangle stuck in front of the wall behind it. Runs
+   the image through a canvas and makes near-black pixels transparent, so
+   only the lit sign itself is visible and the real wall shows through
+   around it. Needs the CDN to allow cross-origin pixel reads — if it
+   doesn't, this quietly falls back to the plain opaque version instead
+   of breaking. */
+function applyOnceTexKeyed(material, key, file, glow=1, threshold=42){
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = ()=>{
+    try{
+      const cv = document.createElement("canvas");
+      cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      const cx = cv.getContext("2d");
+      cx.drawImage(img, 0, 0);
+      const data = cx.getImageData(0, 0, cv.width, cv.height);
+      const px = data.data;
+      for(let i=0;i<px.length;i+=4){
+        const lum = 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2];
+        if(lum < threshold) px[i+3] = 0;
+      }
+      cx.putImageData(data, 0, 0);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      material.map = tex;
+      material.emissiveMap = tex;
+      material.emissive.setHex(0xffffff);
+      material.emissiveIntensity = glow;
+      material.color.setHex(0xffffff);
+      material.transparent = true;
+      material.needsUpdate = true;
+    }catch(e){ applyOnceTex(material, key, file, glow); } // tainted canvas (CORS) — fall back to opaque
+  };
+  img.onerror = ()=>{ /* keep the flat dark fallback plaque */ };
+  img.src = assetSrc(key, file);
+}
 // where the bar station goes on the wall polygon (also anchors the sign + shelf)
 const BAR_ANGLE = Math.PI;   // dead-center on the back wall, facing the player across the table
 function wallPoint(ang, inset=0){
@@ -449,8 +487,12 @@ function buildRoom(){
     ceilingFan = fan;
   }
   // small brass wall lamps — dome shade + warm bulb, reclaimed-industrial
-  // touch instead of neon; each throws its own soft amber pool on the wood
-  for(const ang of [segAngle*1.5, segAngle*3.5, segAngle*6.5, segAngle*8.5]){
+  // touch instead of neon; each throws its own soft amber pool on the wood.
+  // Angles picked to clear the mural (~1.7-2.0 rad), the bar counter/sign
+  // zone (~2.87-3.41 rad) and the poster (~4.68-4.88 rad) — segAngle*3.5
+  // used to land right at the mural's edge, close enough for its cone
+  // shade to visibly poke into the artwork's frame from some angles.
+  for(const ang of [0.85, 2.55, 4.05, 5.55]){
     const wx = Math.sin(ang)*(ROOM_R-0.18), wz = Math.cos(ang)*(ROOM_R-0.18);
     const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.3,0.1), trim);
     bracket.position.set(wx, 2.1, wz); bracket.rotation.y = ang; g.add(bracket);
@@ -468,7 +510,7 @@ function buildRoom(){
   // bar canopy: it only reads from nearby, exactly like a real hung sign
   {
     const signMat = new THREE.MeshStandardMaterial({color:0x0a0705, roughness:0.6, emissive:0x000000});
-    applyOnceTex(signMat, "tex_neon_bar","tex_neon_bar.jpg");
+    applyOnceTexKeyed(signMat, "tex_neon_bar","tex_neon_bar.jpg");
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.1), signMat);
     // the wall segments are 0.28 thick, centered on the room radius, so
     // their inner face sits at ROOM_R-0.14 — mounting the sign at exactly
@@ -809,19 +851,35 @@ function normalize(obj, targetH, groundY=0){
   return obj;
 }
 /* some source GLBs (this revolver included) are authored standing upright
-   rather than lying on their side — whatever axis came out tallest after
-   normalize() is presumably the barrel-to-grip length, not real height, so
-   tip it onto its side and re-ground/re-center against the fresh box. */
+   rather than lying on their side. The old version of this only checked
+   "is Y the tallest axis" — if the real model's thin (thickness) axis
+   wasn't Z, that check could pass while it was still left standing on an
+   edge. This instead finds whichever axis is genuinely the THINNEST one —
+   a real gun's thickness is always its smallest dimension no matter which
+   axis the source model happened to be authored along — and rotates so
+   that thin axis ends up vertical, covering every starting orientation.
+   Also records where the barrel-to-grip (longest) axis ends up, in
+   obj.userData.barrelAxis, so aiming code can point the muzzle correctly
+   without re-guessing the model's local axis convention. */
 function layFlat(obj, groundY=0){
   const box = new THREE.Box3().setFromObject(obj);
   const size = box.getSize(new THREE.Vector3());
-  if(size.y > size.x && size.y > size.z){
-    obj.rotation.x = Math.PI/2;
-    const box2 = new THREE.Box3().setFromObject(obj);
-    const c = box2.getCenter(new THREE.Vector3());
-    obj.position.x -= c.x; obj.position.z -= c.z;
-    obj.position.y += groundY - box2.min.y;
-  }
+  const dims = [
+    {axis:"x", v:size.x, vec:new THREE.Vector3(1,0,0)},
+    {axis:"y", v:size.y, vec:new THREE.Vector3(0,1,0)},
+    {axis:"z", v:size.z, vec:new THREE.Vector3(0,0,1)},
+  ].sort((a,b)=>a.v-b.v);
+  const thin = dims[0].axis;
+  const long = dims[2].vec.clone();
+  if(thin === "z") obj.rotation.x = -Math.PI/2;       // bring local Z (thin) up to +Y
+  else if(thin === "x") obj.rotation.z = Math.PI/2;   // bring local X (thin) up to +Y
+  // thin === "y": already lying flat, no rotation needed
+  long.applyEuler(obj.rotation).round();              // carry the barrel axis through the same rotation
+  const box2 = new THREE.Box3().setFromObject(obj);
+  const c = box2.getCenter(new THREE.Vector3());
+  obj.position.x -= c.x; obj.position.z -= c.z;
+  obj.position.y += groundY - box2.min.y;
+  obj.userData.barrelAxis = long;
   return obj;
 }
 function placeholderChar(color){
@@ -1098,6 +1156,12 @@ async function flyChipsBetween(fromPos, toPos, amount, colorOffset=0){
     }
     await sleep(16);
   }
+  // the tumble above accumulates ~7.8rad of rotation.x by the last step —
+  // fine for chips that get removed the instant they land (see flyChips
+  // below), but these ones are handed back to the caller and can stay
+  // parked and visible (e.g. a bet's pot pile), where that leftover tumble
+  // reads as the chip standing up on its edge instead of resting flat.
+  for(const c of flyers) c.rotation.x = 0;
   return flyers;
 }
 /* animate already-existing chip meshes (e.g. a bet's pot pile) on to a new
@@ -1265,6 +1329,10 @@ scene.add(ch);
 
   const gunMesh = gGun ? layFlat(normalize(gGun, 0.2)) : makeRevolverModel();
   revolver = new THREE.Group(); revolver.add(gunMesh);
+  // the fallback procedural model's own barrel is built pointing along +X
+  // (see makeRevolverModel: barrel offset to +X, grip to -X); the real GLB's
+  // barrel axis was just detected by layFlat above.
+  revolver.userData.barrelAxis = gGun ? (gunMesh.userData.barrelAxis || new THREE.Vector3(0,0,1)) : new THREE.Vector3(1,0,0);
   enableShadow(revolver);
   revolver.position.copy(revolverHome); revolver.rotation.y = rng()*6.28;
   scene.add(revolver);
@@ -1631,22 +1699,25 @@ function glanceAt(observer, target){
   a.glanceDir = Math.atan2(dx,dz) - a.group.rotation.y;
   a.glance = 1;
 }
-// the source GLB's barrel is modeled facing the opposite way from this
-// yaw convention (0 rad = +Z, matching every seat's rotY elsewhere in the
-// file) — without this offset the muzzle aims exactly backward, most
-// obvious when the target is the player (straight-ahead, yaw 0) since
-// "pointing the wrong way" there means pointing directly away from you.
-// If it's ever still wrong, this is the one constant to flip (try 0).
-const GUN_YAW_OFFSET = Math.PI;
+// flips which end of the detected barrel axis is the actual muzzle (the
+// axis-detection in layFlat can't tell barrel from grip on its own). If
+// the gun ever aims exactly backward again, this is the one thing to flip.
+const GUN_BARREL_SIGN = 1;
 async function executeSeat(victim){
   play("drum");
   // revolver rises and aims
   const target = victim===0 ? new THREE.Vector3(0,1.25,1.3) : SEATS[victim].pos.clone().setY(1.25);
   const up = new THREE.Vector3(0, revolverHome.y+0.55, 0);
-  const aimYaw = Math.atan2(target.x - up.x, target.z - up.z) + GUN_YAW_OFFSET;
-  const aimPitch = Math.atan2(target.y - up.y, Math.hypot(target.x-up.x, target.z-up.z));
+  // aim via quaternion (the exact rotation that points the detected barrel
+  // axis at the target) instead of hand-derived yaw/pitch trig — removes
+  // any risk of an arithmetic mistake in the angle formulas themselves;
+  // the only remaining unknown is GUN_BARREL_SIGN above.
+  const worldDir = target.clone().sub(up).normalize();
+  const barrelLocal = (revolver.userData.barrelAxis || new THREE.Vector3(0,0,1)).clone().multiplyScalar(GUN_BARREL_SIGN);
+  const aimQuat = new THREE.Quaternion().setFromUnitVectors(barrelLocal, worldDir);
+  const aimEuler = new THREE.Euler().setFromQuaternion(aimQuat, "XYZ");
   await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 1000); // slow level lift
-  await tweenTo(revolver, up, {x:aimPitch, y:aimYaw, z:0}, 700);        // swing onto the target
+  await tweenTo(revolver, up, {x:aimEuler.x, y:aimEuler.y, z:aimEuler.z}, 700); // swing onto the target
   await sleep(900);                                                      // the dramatic pause
   
   // ----- NEW: PROVE INNOCENCE BY TYPING -----
