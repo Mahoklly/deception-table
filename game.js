@@ -2,8 +2,8 @@
 // three.js scene + HTML overlay UI. Fixed-timestep sim, seeded RNG, command-object input.
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/addons/GLTFLoader.js";
-import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js";
-import { DECK, NPCS, RULES } from "./data.js";
+import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260718a";
+import { DECK, NPCS, RULES } from "./data.js?v=20260718a";
 import { ASSET_URLS } from "./assets_urls.js";
 const assetSrc = (key, rel) => ASSET_URLS[key] || ("./assets/"+rel);
 
