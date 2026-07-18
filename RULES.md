@@ -25,50 +25,46 @@ Say a word each round. Vote. The revolver settles it.
   that sound plausible from context and from what they've overheard.
 - The more "bold" words the Imposter hears from the crew, the better their
   bluffing gets over the match (they start guessing smarter, closer words).
-- From **round 2 onward**, anyone may call for a vote instead of waiting.
-- After **round 4**, a vote is forced automatically.
+- There's no early vote — every cycle plays out its full round count before
+  anyone votes. This is deliberate: enough rounds to actually build a real
+  read on the table before deciding.
+- The **first** cycle of a match is **4 rounds**. Once a seat has been
+  eliminated, every cycle after that shortens to **3 rounds** — fewer
+  people left at the table means less needs to be said before the next
+  vote.
 
 ## The vote
 
 - Everyone votes for who they think the Imposter is.
-- **Majority pick** gets "shot at" with the revolver.
+- **Majority pick** is executed on the spot — guilty or not. There's no
+  "prove your innocence" chance anymore; the vote is final.
 - **Tie vote** → the chamber is empty this round. No one is harmed. Play one
   more word round, then vote again.
-
-## Proving innocence
-
-- Whoever gets voted must **type the secret word** to prove they're innocent.
-  - **You**, if voted: type the secret word. You get **2 attempts**.
-  - **NPCs**, if voted: they attempt it automatically — crew NPCs almost
-    always know it; the Imposter only has a chance, and that chance grows
-    the more crew words they've overheard during the match.
-- **Correct** → proven innocent, they survive, play continues.
-- **Wrong** (or out of attempts) → the revolver fires. They're out.
 
 ## How the match ends
 
 - **The executed seat was the Imposter** → the crew wins. If it was you,
   the crew wins and you're safe; if you were the Imposter and got caught,
   you lose.
-- **You get shot and you were innocent** → you lose.
+- **You get executed and you were innocent** → you lose, even though you
+  did nothing wrong. The table got it wrong, and that's on them.
 - **Only 2 seats remain alive and the Imposter is still uncaught** → the
   Imposter wins. If that's you, you win a perfect bluff; if it's an NPC,
   you lose.
 
 ## Getting the vote wrong has real costs
 
-Whenever the executed seat turns out to be **innocent**, three things
-happen at once — the game is designed to punish careless or wrong
-accusations, not just shrug them off:
+Whenever the executed seat turns out to be **innocent**, the table pays
+for the mistake, not the crew as a whole — the cost lands specifically on
+whoever voted wrong:
 
-- **Everyone who voted for the innocent seat** (you or any NPC) forfeits
-  a quarter of their table chip stake (see below), *and* permanently
-  loses one word option for the rest of the match — down to a minimum
-  of one word, so you're never fully locked out, just squeezed.
-- **The wrongly-accused seat**, having just survived being shot at, is
-  too shaken to speak next round — their turn is skipped entirely.
-- **The Imposter** banks one extra guaranteed real word for free, on
-  top of whatever they've already picked up from overhearing the crew.
+- **Everyone who voted for the innocent seat** permanently loses **two**
+  word options for the rest of the match (down to a minimum of one), and
+  pays a flat **5-chip fine**.
+- **That entire fine goes straight to the seat who was wrongly executed**
+  — small, direct compensation, not spread across the table.
+- **The Imposter** banks one extra guaranteed real word for free, on top
+  of whatever they've already picked up from overhearing the crew.
 
 This stacks every time it happens — a match with several bad votes gets
 noticeably harder, on purpose.
@@ -77,9 +73,8 @@ noticeably harder, on purpose.
 
 Once per match, if you're the Imposter, you can spend **8 chips** from
 your own table stake for one guaranteed real word instead of waiting on
-luck — a "Buy a Clue" button appears next to Call the Vote on your turn.
-NPC imposters do this automatically, more often when they're the top
-suspect.
+luck — a "Buy a Clue" button appears on your turn. NPC imposters do this
+automatically, more often when they're the top suspect.
 
 ## Full House mode
 

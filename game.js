@@ -1497,6 +1497,15 @@ function crewHand(seat=0){
   if(m[0]) hand.push({w:m[0],tier:"medium"});
   for(const w of s){ if(hand.length>=size) break; hand.push({w,tier:"subtle"}); }
   let i=1; while(hand.length<size && (m[i]||o[i])){ const w=m[i]||o[i]; hand.push({w,tier:m[i]?"medium":"obvious"}); i++; }
+  // a long match (several vote cycles, no early-out) can run the card's
+  // word pool dry — once nothing unused is left, fall back to reusing
+  // already-spoken words instead of leaving the hand empty with nothing
+  // to click (that was a real soft-lock)
+  if(!hand.length){
+    const pool = shuffle(G.card.obvious.concat(G.card.medium, G.card.subtle));
+    for(const w of pool){ if(hand.length>=size) break;
+      hand.push({w, tier: G.card.obvious.includes(w)?"obvious":G.card.medium.includes(w)?"medium":"subtle"}); }
+  }
   return shuffle(hand).slice(0,size);
 }
 function imposterHand(seat=0){
@@ -1505,7 +1514,12 @@ function imposterHand(seat=0){
   const learnedUnlocked = Math.floor(G.heardCrewWords/2) + (G.impBonusClues||0);
   const learned = shuffle(unused(G.card.subtle.concat(G.card.medium))).slice(0,learnedUnlocked)
     .map(w=>({w,tier:"bluff"}));
-  return shuffle(learned.concat(b)).slice(0,size);
+  let hand = shuffle(learned.concat(b)).slice(0,size);
+  if(!hand.length){
+    const pool = shuffle(G.card.bluff.concat(G.card.subtle, G.card.medium));
+    hand = pool.slice(0,size).map(w=>({w,tier:"bluff"}));
+  }
+  return hand;
 }
 function npcShouldBuyClue(seat){
   const npc = actors[seat].npc;
@@ -1988,7 +2002,7 @@ async function runMatch(){
       const result = await doVote();
       if(G.over) break matchLoop;
       if(result==="tie"){ G.round = G.maxRounds; }      // one more word round, then re-vote
-      else { G.round=1; G.maxRounds=RULES.maxRounds; }  // always a fresh full 4-round cycle
+      else { G.round=1; G.maxRounds=3; }                // a seat is out — shorter cycles from here on
     } else {
       G.round++;
     }
