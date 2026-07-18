@@ -104,7 +104,9 @@ en: {
   radio_station_dust: "Dust & Whiskey",
   radio_station_porch: "Back Porch Blues",
   radio_station_static: "Smoke & Static",
-  wrong_vote_penalty: "Wrong vote — their chips are seized and split among the rest",
+  wrong_vote_penalty: "Wrong vote — chips seized, and their judgment falters (one fewer word, for good)",
+  skip_turn_you: "Still shaken — you sit out this round.",
+  skip_turn_npc: "{n} is still too shaken to speak this round.",
 },
 ku: {
   title_blurb: "سێیان لەنێوان ئێوەدا نهێنیەکی هاوبەشیان هەیە. یەکێکتان تەنها ئاماژەیەکی هەیە. هەر خولێک وشەیەک بڵێ — بەقەد پێویست شاراوە بۆ پاراستنی نهێنییەکە، بەقەد پێویست ڕوون بۆ سەلماندنی زانینت. پاشان دەنگ بدە. تفەنگەکە پاشماوەکە چارەسەر دەکات.",
@@ -203,7 +205,9 @@ ku: {
   radio_station_dust: "تۆز و ویسکی",
   radio_station_porch: "بلوزی ئێوارە",
   radio_station_static: "دووکەڵ و نویز",
-  wrong_vote_penalty: "دەنگدانی هەڵە — چیپەکانیان دەسڕدرێن و دابەش دەکرێن",
+  wrong_vote_penalty: "دەنگدانی هەڵە — چیپەکانیان دەسڕدرێن و هەڵسەنگاندنیان لاوازتر دەبێت",
+  skip_turn_you: "هێشتا شۆکداریت — ئەم خولە بێدەنگ دەبیت.",
+  skip_turn_npc: "{n} هێشتا زۆر شۆکداره بۆ قسەکردن ئەم خولە.",
 },
 };
 

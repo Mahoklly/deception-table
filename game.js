@@ -1469,6 +1469,12 @@ function newMatch(){
   G.usedWords = new Set(); G.spoken=ALL_SEATS.map(()=>[]);
   G.heat=new Array(SEAT_COUNT).fill(0); G.heardCrewWords=0; G.voteCalled=false; G.extraRound=false; G.over=false;
   clueBought = new Array(SEAT_COUNT).fill(false);
+  // escalating difficulty from wrong votes: each wrong voter permanently
+  // loses a word option, a wrongly-accused survivor sits out their next
+  // round, and the imposter banks a free real word — see doVote()
+  G.handPenalty = new Array(SEAT_COUNT).fill(0);
+  G.skipTurn = new Array(SEAT_COUNT).fill(false);
+  G.impBonusClues = 0;
   // per-observer suspicion matrix (crew NPCs only use their own row)
   G.suspicion = ALL_SEATS.map(()=>new Array(SEAT_COUNT).fill(0));
   for(const a of actors) if(a){ a.alive=true; a.slump=0; a.lean=0; }
@@ -1485,21 +1491,27 @@ function setupCardHUD(){ const c=$("myCard"); if(c) c.style.display="none"; }
 
 /* ---------- word AI ---------- */
 function unused(list){ return list.filter(w=>!G.usedWords.has(w)); }
-function crewHand(){
+function handSizeFor(seat){
+  const penalty = (G.handPenalty && G.handPenalty[seat]) || 0;
+  return Math.max(1, RULES.handSize - penalty);
+}
+function crewHand(seat=0){
+  const size = handSizeFor(seat);
   const o=shuffle(unused(G.card.obvious)), m=shuffle(unused(G.card.medium)), s=shuffle(unused(G.card.subtle));
   const hand=[];
   if(o[0]) hand.push({w:o[0],tier:"obvious"});
   if(m[0]) hand.push({w:m[0],tier:"medium"});
-  for(const w of s){ if(hand.length>=RULES.handSize) break; hand.push({w,tier:"subtle"}); }
-  let i=1; while(hand.length<RULES.handSize && (m[i]||o[i])){ const w=m[i]||o[i]; hand.push({w,tier:m[i]?"medium":"obvious"}); i++; }
-  return shuffle(hand).slice(0,RULES.handSize);
+  for(const w of s){ if(hand.length>=size) break; hand.push({w,tier:"subtle"}); }
+  let i=1; while(hand.length<size && (m[i]||o[i])){ const w=m[i]||o[i]; hand.push({w,tier:m[i]?"medium":"obvious"}); i++; }
+  return shuffle(hand).slice(0,size);
 }
-function imposterHand(){
+function imposterHand(seat=0){
+  const size = handSizeFor(seat);
   const b=shuffle(unused(G.card.bluff)).map(w=>({w,tier:"bluff"}));
-  const learnedUnlocked = Math.floor(G.heardCrewWords/3);
+  const learnedUnlocked = Math.floor(G.heardCrewWords/3) + (G.impBonusClues||0);
   const learned = shuffle(unused(G.card.subtle.concat(G.card.medium))).slice(0,learnedUnlocked)
     .map(w=>({w,tier:"bluff"}));
-  return shuffle(learned.concat(b)).slice(0,RULES.handSize);
+  return shuffle(learned.concat(b)).slice(0,size);
 }
 function npcShouldBuyClue(seat){
   const npc = actors[seat].npc;
@@ -1518,7 +1530,7 @@ function npcPickWord(seat){
         return {w:pick(pool), tier:"bluff"};
       }
     }
-    const hand=imposterHand();
+    const hand=imposterHand(seat);
     return hand[0] || {w:pick(G.card.bluff), tier:"bluff"};
   }
   const beingSuspected = G.heat[seat] > Math.max(...aliveSeats().filter(s=>s!==seat).map(s=>G.heat[s]), 0.01);
@@ -1737,13 +1749,23 @@ async function executeSeat(victim){
   // revolver rises and aims
   const target = victim===0 ? new THREE.Vector3(0,1.25,1.3) : SEATS[victim].pos.clone().setY(1.25);
   const up = new THREE.Vector3(0, revolverHome.y+0.55, 0);
-  // aim via quaternion (the exact rotation that points the detected barrel
-  // axis at the target) instead of hand-derived yaw/pitch trig — removes
-  // any risk of an arithmetic mistake in the angle formulas themselves;
-  // the only remaining unknown is GUN_BARREL_SIGN above.
-  const worldDir = target.clone().sub(up).normalize();
+  // aim via quaternion, built the roll-safe way: setFromUnitVectors alone
+  // finds *a* rotation that points the barrel at the target, but it's free
+  // to pick any roll (twist around the barrel) to get there — which is
+  // exactly why the gun was showing up canted at odd angles instead of
+  // held level. lookAt() resolves that ambiguity properly using an explicit
+  // up vector, so: get lookAt's roll-safe rotation (which points local -Z
+  // at the target), then compose it with a *fixed* correction that maps
+  // our detected barrel axis onto -Z. That fixed correction is the same
+  // every time (doesn't depend on the target), so it can't reintroduce the
+  // per-shot roll wobble the way doing this in one step did.
+  const _dummy = new THREE.Object3D();
+  _dummy.position.copy(up);
+  _dummy.up.set(0,1,0);
+  _dummy.lookAt(target);
   const barrelLocal = (revolver.userData.barrelAxis || new THREE.Vector3(0,0,1)).clone().multiplyScalar(GUN_BARREL_SIGN);
-  const aimQuat = new THREE.Quaternion().setFromUnitVectors(barrelLocal, worldDir);
+  const axisRemap = new THREE.Quaternion().setFromUnitVectors(barrelLocal, new THREE.Vector3(0,0,-1));
+  const aimQuat = _dummy.quaternion.clone().multiply(axisRemap);
   const aimEuler = new THREE.Euler().setFromQuaternion(aimQuat, "XYZ");
   await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 1000); // slow level lift
   await tweenTo(revolver, up, {x:aimEuler.x, y:aimEuler.y, z:aimEuler.z}, 700); // swing onto the target
@@ -2055,6 +2077,12 @@ async function runMatch(){
     // ---- word round ----
     for(const seat of aliveSeats()){
       if(G.voteCalled) break;
+      if(G.skipTurn[seat]){
+        G.skipTurn[seat] = false;
+        setBanner(seat===0 ? STR.skip_turn_you : fmt(STR.skip_turn_npc,{n:nameOf(seat)}), 1800);
+        await sleep(1800);
+        continue;
+      }
       if(seat===0){
         setPrompt(STR.prompt_your_turn);
         offerCallVote();
@@ -2146,10 +2174,17 @@ async function doVote(){
   resolveBet(bet, victim, died);
   if(bet) await sleep(2000);
   // the table just wrongly condemned an innocent seat — everyone who voted
-  // for them (not just the victim) pays for it, in chips rather than blood
+  // for them pays in chips AND in judgment (one fewer word option, for the
+  // rest of the match), the innocent victim is too shaken to speak next
+  // round, and the imposter walks away from the table's mistake smarter
   if(!wasImp){
     const wrongVoters = Object.keys(chosenBy).filter(s=>+chosenBy[s]===victim).map(Number);
-    if(wrongVoters.length) await penalizeWrongVoters(wrongVoters);
+    if(wrongVoters.length){
+      for(const w of wrongVoters) G.handPenalty[w]++;
+      await penalizeWrongVoters(wrongVoters);
+    }
+    if(!died) G.skipTurn[victim] = true;
+    G.impBonusClues = (G.impBonusClues||0) + 1;
   }
   // outcomes
   if(wasImp){ endMatch(victim===0 ? "lose_imp" : "win_crew"); return; }

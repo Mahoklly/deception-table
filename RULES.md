@@ -55,6 +55,38 @@ Say a word each round. Vote. The revolver settles it.
   Imposter wins. If that's you, you win a perfect bluff; if it's an NPC,
   you lose.
 
+## Getting the vote wrong has real costs
+
+Whenever the executed seat turns out to be **innocent**, three things
+happen at once — the game is designed to punish careless or wrong
+accusations, not just shrug them off:
+
+- **Everyone who voted for the innocent seat** (you or any NPC) forfeits
+  a quarter of their table chip stake (see below), *and* permanently
+  loses one word option for the rest of the match — down to a minimum
+  of one word, so you're never fully locked out, just squeezed.
+- **The wrongly-accused seat**, having just survived being shot at, is
+  too shaken to speak next round — their turn is skipped entirely.
+- **The Imposter** banks one extra guaranteed real word for free, on
+  top of whatever they've already picked up from overhearing the crew.
+
+This stacks every time it happens — a match with several bad votes gets
+noticeably harder, on purpose.
+
+## The Imposter can also buy a clue
+
+Once per match, if you're the Imposter, you can spend **8 chips** from
+your own table stake for one guaranteed real word instead of waiting on
+luck — a "Buy a Clue" button appears next to Call the Vote on your turn.
+NPC imposters do this automatically, more often when they're the top
+suspect.
+
+## Full House mode
+
+An optional 6-seat table (you + 5 NPCs, including Deacon Rourke and Old
+Ma Kessler), selectable from Settings → Table Size. Same rules throughout,
+just more players and a bigger table.
+
 ---
 
 ## Casino chips — automatic table stakes
