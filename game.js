@@ -420,53 +420,133 @@ function applyOnceTexKeyed(material, key, file, glow=1, threshold=42){
 }
 // where the bar station goes on the wall polygon (also anchors the sign + shelf)
 const BAR_ANGLE = Math.PI;   // dead-center on the back wall, facing the player across the table
+/* ---- room footprint: an irregular polygon, not a perfect circle ----
+   A uniform-radius decagon reads as a flat, artificial "box" no matter how
+   it's dressed. Real dive bars aren't symmetric: the bar itself sits in a
+   deep alcove that recedes further back than the rest of the room. SIDES
+   vertices are laid out with a per-vertex radius that bulges way out
+   around BAR_IDX (the wall behind the bar) and tapers back down to the
+   base ROOM_R everywhere else — an asymmetric footprint, not a circle. */
+const SIDES = 14, segAngle = (Math.PI*2)/SIDES;
+const BAR_IDX = SIDES/2; // index 7 — lands exactly on BAR_ANGLE=π
+function vertRadius(i){
+  i = ((i%SIDES)+SIDES)%SIDES;
+  let d = Math.abs(i-BAR_IDX); d = Math.min(d, SIDES-d);
+  if(d===0) return ROOM_R*1.62;
+  if(d===1) return ROOM_R*1.42;
+  if(d===2) return ROOM_R*1.2;
+  if(d===3) return ROOM_R*1.06;
+  return ROOM_R;
+}
+function vertXZ(i){ const ang=segAngle*i, r=vertRadius(i); return {x:Math.sin(ang)*r, z:Math.cos(ang)*r}; }
+function radiusAtAngle(ang){
+  const a = ((ang%(Math.PI*2))+(Math.PI*2))%(Math.PI*2);
+  const idx = a/segAngle, i0 = Math.floor(idx)%SIDES, i1 = (i0+1)%SIDES, t = idx-Math.floor(idx);
+  return vertRadius(i0) + (vertRadius(i1)-vertRadius(i0))*t;
+}
 function wallPoint(ang, inset=0){
-  const r = ROOM_R - inset;
+  const r = radiusAtAngle(ang) - inset;
   return new THREE.Vector3(Math.sin(ang)*r, 0, Math.cos(ang)*r);
 }
 const floorMat = new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:0.9});
 applyRepeatTex(floorMat, "tex_wood_floor","tex_wood_floor.jpg", 6, 6);   // no tint — let the real photo read as-is
-const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_R, 48), floorMat);
+const floorShape = new THREE.Shape();
+for(let i=0;i<SIDES;i++){ const v=vertXZ(i); if(i===0) floorShape.moveTo(v.x,v.z); else floorShape.lineTo(v.x,v.z); }
+floorShape.closePath();
+const floor = new THREE.Mesh(new THREE.ShapeGeometry(floorShape, 2), floorMat);
 floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
 let roomGroup = null;
 
-/* ---- true 3D bar room: walled polygon, beamed ceiling, neon sconces ----
-   Real box/cylinder geometry with physical X/Y/Z coordinates — no flat
-   backdrop image or skybox trick. Replaced at runtime if a Higgsfield-
-   generated room_tavern.glb is hooked up (see loadWorld()). */
+/* ---- true 3D bar room: irregular walled polygon, beamed ceiling, neon
+   sconces — real box/cylinder geometry with physical X/Y/Z coordinates,
+   no flat backdrop image or skybox trick. Replaced at runtime if a
+   Higgsfield-generated room_tavern.glb is hooked up (see loadWorld()). */
+/* grimy, mottled peeling-wallpaper texture — canvas-generated, no asset
+   needed. Alternated with the real wood-wall photo across segments so the
+   room isn't one clean, uniform material all the way around. */
+function makeGrimeTex(){
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 256;
+  const cx = cv.getContext("2d");
+  cx.fillStyle = "#3a2c1e"; cx.fillRect(0,0,256,256);
+  for(let i=0;i<420;i++){
+    const x=Math.random()*256, y=Math.random()*256, r=6+Math.random()*22;
+    const shade = 20+Math.random()*40;
+    cx.fillStyle = `rgba(${shade+10},${shade},${shade-6},${0.12+Math.random()*0.2})`;
+    cx.beginPath(); cx.ellipse(x,y,r,r*(0.5+Math.random()*0.7),Math.random()*Math.PI,0,Math.PI*2); cx.fill();
+  }
+  // a few peeling-paper streaks
+  for(let i=0;i<10;i++){
+    const x=Math.random()*256, y=Math.random()*256;
+    cx.fillStyle = "rgba(70,55,40,0.35)";
+    cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x+18+Math.random()*30, y+6); cx.lineTo(x+10, y+40+Math.random()*30); cx.closePath(); cx.fill();
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 function buildRoom(){
   const g = new THREE.Group();
-  const SIDES = 10, segAngle = (Math.PI*2)/SIDES;
-  const segW = 2*ROOM_R*Math.tan(segAngle/2)*1.03;
 
   // a faint baseline emissive keeps the walls from ever reading as pure black
   // when they're far from every point light, without faking flat unlit color
-  const plaster = new THREE.MeshStandardMaterial({color:0x4a3a26, roughness:0.95, emissive:0x140d06, emissiveIntensity:0.7});
+  const plaster = new THREE.MeshStandardMaterial({color:0x362a1c, roughness:0.95, emissive:0x0f0a05, emissiveIntensity:0.6});
   const trim    = new THREE.MeshStandardMaterial({color:0x2a1d10, roughness:0.9, emissive:0x0c0704, emissiveIntensity:0.6});
   const beamMat = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.85, emissive:0x0a0603, emissiveIntensity:0.6});
-  applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", segW/2.1, WALL_H/2.1);   // no tint — let the real photo read as-is
+  applyRepeatTex(plaster, "tex_wood_wall","tex_wood_wall.jpg", 1.6, WALL_H/2.1, 0xc0a888);   // darker/weathered tint on the real photo
+  const grimeMat = new THREE.MeshStandardMaterial({color:0x453626, roughness:1, emissive:0x0c0805, emissiveIntensity:0.5});
+  const grimeTex = makeGrimeTex();
 
   for(let i=0;i<SIDES;i++){
-    const ang = segAngle*i;
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(segW, WALL_H, 0.28), plaster);
-    wall.position.set(Math.sin(ang)*ROOM_R, WALL_H/2, Math.cos(ang)*ROOM_R);
-    wall.rotation.y = ang;
+    const a = vertXZ(i), b = vertXZ(i+1);
+    const dx = b.x-a.x, dz = b.z-a.z, segW = Math.hypot(dx,dz)*1.03;
+    const midx = (a.x+b.x)/2, midz = (a.z+b.z)/2, rot = Math.atan2(-dz, dx);
+    // every third segment (skipping the bar alcove itself, which gets its
+    // own dressing) is grimy peeling wallpaper instead of clean wood photo
+    const distToBar = Math.min(Math.abs(i-BAR_IDX), SIDES-Math.abs(i-BAR_IDX));
+    const grimy = distToBar > 1 && i%3===0;
+    let mat = plaster;
+    if(grimy){
+      mat = grimeMat.clone();
+      mat.map = grimeTex; mat.needsUpdate = true;
+    }
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(segW, WALL_H, 0.28), mat);
+    wall.position.set(midx, WALL_H/2, midz);
+    wall.rotation.y = rot;
     g.add(wall);
     const base = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.24, 0.34), trim);
-    base.position.set(Math.sin(ang)*ROOM_R, 0.12, Math.cos(ang)*ROOM_R);
-    base.rotation.y = ang;
+    base.position.set(midx, 0.12, midz);
+    base.rotation.y = rot;
     g.add(base);
   }
-  // beamed ceiling — a real cap mesh plus radiating box beams above the lantern
-  const ceiling = new THREE.Mesh(new THREE.CylinderGeometry(ROOM_R*1.02, ROOM_R*1.02, 0.22, SIDES),
+  // beamed ceiling — a real cap mesh (sized to cover the deepest alcove)
+  // plus radiating box beams above the lantern
+  const ceilR = ROOM_R*1.62*1.05;
+  const ceiling = new THREE.Mesh(new THREE.CylinderGeometry(ceilR, ceilR, 0.22, SIDES),
     new THREE.MeshStandardMaterial({color:0x120b06, roughness:0.95, side:THREE.DoubleSide}));
   ceiling.position.y = WALL_H;
   g.add(ceiling);
   for(let i=0;i<6;i++){
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.2, ROOM_R*1.9), beamMat);
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.2, ceilR*1.15), beamMat);
     beam.position.y = WALL_H - 0.16;
     beam.rotation.y = (Math.PI/6)*i;
     g.add(beam);
+  }
+  // structural support pillars — thick timber posts, not the thin steel
+  // trim columns further down; placed flanking the bar alcove where a
+  // real room would need something holding the deeper ceiling span up
+  {
+    const postMat = new THREE.MeshStandardMaterial({color:0x2a1c10, roughness:0.9});
+    const capMat = new THREE.MeshStandardMaterial({color:0x1c130a, roughness:0.8});
+    for(const ang of [BAR_ANGLE-0.9, BAR_ANGLE+0.9]){
+      const p = wallPoint(ang, 0.3); // just inside the room from the deeper alcove wall
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.34,WALL_H,0.34), postMat);
+      post.position.set(p.x, WALL_H/2, p.z);
+      g.add(post);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.14,0.5), capMat);
+      cap.position.set(p.x, WALL_H-0.07, p.z);
+      g.add(cap);
+    }
   }
   // old ceiling fan, slowly turning — cheap ambient motion overhead so the
   // room doesn't feel frozen, without putting any more people in it
@@ -495,7 +575,7 @@ function buildRoom(){
   // used to land right at the mural's edge, close enough for its cone
   // shade to visibly poke into the artwork's frame from some angles.
   for(const ang of [0.85, 2.55, 4.05, 5.55]){
-    const wx = Math.sin(ang)*(ROOM_R-0.18), wz = Math.cos(ang)*(ROOM_R-0.18);
+    const {x:wx, z:wz} = wallPoint(ang, 0.18);
     const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.3,0.1), trim);
     bracket.position.set(wx, 2.1, wz); bracket.rotation.y = ang; g.add(bracket);
     const shade = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.12, 12, 1, true),
@@ -508,21 +588,45 @@ function buildRoom(){
     const wash = new THREE.PointLight(0xffa855, 1.3, 6, 1.8);
     wash.position.set(wx, 2.2, wz); g.add(wash);
   }
-  // neon "BAR" sign — a real plane mounted flush on the wall, above the
-  // bar canopy: it only reads from nearby, exactly like a real hung sign
+  // hand-chalked menu board — a dirty, hung wooden-framed chalkboard over
+  // the bar instead of a clean printed neon sign; canvas-drawn, no asset
+  // dependency, and it reads as "someone actually runs this place" rather
+  // than a polished storefront logo
   {
-    const signMat = new THREE.MeshStandardMaterial({color:0x0a0705, roughness:0.6, emissive:0x000000});
-    applyOnceTexKeyed(signMat, "tex_neon_bar","tex_neon_bar.png", 1, 100);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.1), signMat);
-    // the wall segments are 0.28 thick, centered on the room radius, so
-    // their inner face sits at ROOM_R-0.14 — mounting the sign at exactly
-    // that same radius put it perfectly coplanar with the wall (z-fighting,
-    // the flicker). 0.22 clears the wall face with real, visible standoff.
+    const cv = document.createElement("canvas"); cv.width = 384; cv.height = 384;
+    const cx = cv.getContext("2d");
+    cx.fillStyle = "#1a2420"; cx.fillRect(0,0,384,384);
+    // chalky mottling so the board doesn't read as a flat green rectangle
+    for(let i=0;i<160;i++){
+      cx.fillStyle = `rgba(200,205,190,${0.02+Math.random()*0.05})`;
+      cx.beginPath(); cx.arc(Math.random()*384, Math.random()*384, 4+Math.random()*14, 0, Math.PI*2); cx.fill();
+    }
+    cx.strokeStyle = "#dcd8c8"; cx.textAlign = "center";
+    cx.font = "italic 52px Georgia"; cx.fillStyle = "#e8e4d0";
+    cx.save(); cx.translate(192,90); cx.rotate(-0.02); cx.fillText("The Bar", 0, 0); cx.restore();
+    cx.strokeStyle = "rgba(220,216,200,.6)"; cx.lineWidth = 2;
+    cx.beginPath(); cx.moveTo(60,120); cx.lineTo(324,120); cx.stroke();
+    cx.font = "28px Georgia"; cx.fillStyle = "#d8d4c0";
+    const items = ["Whiskey — neat", "House Red", "Something Stronger", "Ask No Questions"];
+    items.forEach((t,i)=> cx.fillText(t, 192, 175 + i*48));
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(1.15,1.15),
+      new THREE.MeshStandardMaterial({map:tex, roughness:0.85, emissive:0x1a2420, emissiveIntensity:0.15}));
     const sp = wallPoint(BAR_ANGLE, 0.22);
-    sign.position.set(sp.x, 3.4, sp.z);
-    sign.rotation.y = BAR_ANGLE + Math.PI;
-    g.add(sign);
-    neonSignMat = signMat;
+    board.position.set(sp.x, 3.4, sp.z);
+    board.rotation.y = BAR_ANGLE + Math.PI;
+    g.add(board);
+    // a rough wood frame, slightly askew — nothing here is perfectly square
+    const frameMat = new THREE.MeshStandardMaterial({color:0x2a1c10, roughness:0.9});
+    for(const [fw,fh,fx,fy,rz] of [[1.28,0.08,0,0.6,0.01],[1.28,0.08,0,-0.6,-0.008],[0.08,1.28,-0.6,0,0.006],[0.08,1.28,0.6,0,0]]){
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(fw,fh,0.05), frameMat);
+      bar.position.set(fx,fy,0.02); bar.rotation.z = rz;
+      board.add(bar);
+    }
+    const boardLight = new THREE.SpotLight(0xffcf9a, 1.8, 3, 0.6, 0.5);
+    boardLight.position.set(sp.x, 3.9, sp.z*0.7);
+    boardLight.target = board;
+    g.add(boardLight); g.add(boardLight.target);
   }
   scene.add(g);
   enableShadow(g);
@@ -620,47 +724,86 @@ function buildRoadhouseBar(){
     wash.position.copy(grp.position); g.add(wash);
   }
 
-  // ---- the bar station: warm wooden counter with a backlit liquor shelf ----
-  // built in wall-local coordinates (x along the wall, +z into the room)
+  // procedural glass bottle — body + shoulder + neck + cap, quick to vary
+  // by color/height so a shelf full of them doesn't read as one mesh copy-
+  // pasted a dozen times
+  const makeBottle = (hex, h=1)=>{
+    const glassMat = new THREE.MeshPhysicalMaterial({color:hex, roughness:0.15, metalness:0, transmission:0.55, transparent:true, opacity:0.92});
+    const bg = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.05,0.22*h,10), glassMat);
+    body.position.y = 0.11*h; bg.add(body);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.032,0.14*h,8), glassMat);
+    neck.position.y = 0.22*h+0.07*h; bg.add(neck);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.017,0.03,8),
+      new THREE.MeshStandardMaterial({color:0x1a1a1a, roughness:0.4, metalness:0.5}));
+    cap.position.y = 0.22*h+0.14*h+0.015; bg.add(cap);
+    return bg;
+  };
+  const bottleColors = [0x8a3a1e, 0x2a5a2a, 0x6a1a1a, 0xc99a3a, 0x1a3a5a, 0x3a2a1a, 0x8a8a3a];
+
+  // ---- the bar station: a long, heavy wooden counter sweeping across the
+  // whole alcove, backed by a massive shelf stacked with real bottle rows —
+  // built in wall-local coordinates (x along the wall, +z into the room) ----
   {
     const bar = new THREE.Group();
     bar.position.copy(wallPoint(BAR_ANGLE, 0));
     bar.rotation.y = BAR_ANGLE + Math.PI;
-    // real backlit-shelf photo (rows of bottles against a lit mirror) instead
-    // of a flat emissive color card — falls back to a plain amber panel only
-    // until/unless the photo loads
-    const glowPanelMat = new THREE.MeshStandardMaterial({color:0xffb060, emissive:0xffa040, emissiveIntensity:0.55});
-    applyOnceTex(glowPanelMat, "tex_backlit_shelf","tex_backlit_shelf.jpg", 0.65);
-    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.7), glowPanelMat);
-    glowPanel.position.set(0, 1.35, 0.3); bar.add(glowPanel);
+    const BAR_W = 6.4;
+    // real backlit-shelf photo behind the bottles, dimmed down to a mirror-
+    // glow backdrop rather than the whole visual (the real bottle geometry
+    // in front of it is what should actually read)
+    const glowPanelMat = new THREE.MeshStandardMaterial({color:0xaa7a40, emissive:0xaa6a30, emissiveIntensity:0.4});
+    applyOnceTex(glowPanelMat, "tex_backlit_shelf","tex_backlit_shelf.jpg", 0.4);
+    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(BAR_W-0.3,1.9), glowPanelMat);
+    glowPanel.position.set(0, 1.5, 0.15); bar.add(glowPanel);
+    // two full-width shelf boards in front of the glow panel, densely
+    // packed with individually-placed bottles — "filled to the brim"
+    const shelfMat = new THREE.MeshStandardMaterial({color:0x241708, roughness:0.85});
+    for(const sy of [1.05, 1.85]){
+      const board = new THREE.Mesh(new THREE.BoxGeometry(BAR_W-0.4, 0.05, 0.34), shelfMat);
+      board.position.set(0, sy, 0.3); bar.add(board);
+      const n = 17;
+      for(let i=0;i<n;i++){
+        const bx = -((BAR_W-0.8)/2) + i*((BAR_W-0.8)/(n-1)) + (Math.random()-0.5)*0.05;
+        const hgt = 0.75 + Math.random()*0.55;
+        const bottle = makeBottle(bottleColors[(i+ (sy>1.5?3:0))%bottleColors.length], hgt);
+        bottle.position.set(bx, sy+0.025, 0.28 + (Math.random()-0.5)*0.08);
+        bottle.rotation.y = Math.random()*0.3;
+        bar.add(bottle);
+      }
+    }
     // reclaimed-wood canopy over the counter, hung with a row of bare bulbs
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.1,1.6), wood);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(BAR_W,0.1,1.6), wood);
     canopy.position.set(0, 2.78, 1.1); bar.add(canopy);
-    for(let i=0;i<9;i++){
-      const bx = -1.75 + i*0.44;
+    const bulbCount = 15;
+    for(let i=0;i<bulbCount;i++){
+      const bx = -BAR_W/2+0.2 + i*((BAR_W-0.4)/(bulbCount-1));
       const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.14,4), new THREE.MeshBasicMaterial({color:0x0a0a0a}));
       cord.position.set(bx, 2.66, 1.9); bar.add(cord);
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035,8,8),
         new THREE.MeshStandardMaterial({color:0xffd898, emissive:0xffb050, emissiveIntensity:2.8}));
       bulb.position.set(bx, 2.58, 1.9); bar.add(bulb);
     }
-    // long wooden counter with a polished brass trim along its front edge
-    const counter = new THREE.Mesh(new THREE.BoxGeometry(3.4,1.0,0.5), wood);
+    // the counter itself: a heavy, continuous wooden bar with a polished
+    // brass trim along its front edge
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(BAR_W,1.0,0.5), wood);
     counter.position.set(0, 0.5, 1.45); bar.add(counter);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.05,0.66), darkTop);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(BAR_W+0.2,0.05,0.66), darkTop);
     top.position.set(0, 1.03, 1.45); bar.add(top);
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(3.6,0.04,0.04), brass);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(BAR_W+0.2,0.04,0.04), brass);
     trim.position.set(0, 1.0, 1.79); bar.add(trim);
-    const warmGlow = new THREE.PointLight(0xffab5a, 2.0, 7, 1.6);
-    warmGlow.position.set(0, 1.4, 1.9); bar.add(warmGlow);
-    // glowing tank on the counter — the reference's one cool blue-violet
-    // accent against all the warm amber; a translucent box + inner light
+    for(const lx of [-BAR_W/2+1, 0, BAR_W/2-1]){
+      const warmGlow = new THREE.PointLight(0xffab5a, 1.7, 6.5, 1.7);
+      warmGlow.position.set(lx, 1.4, 1.9); bar.add(warmGlow);
+    }
+    // glowing tank on the counter — one cool blue-violet accent against all
+    // the warm amber
     const tank = new THREE.Group();
     const glass = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.36,0.32),
       new THREE.MeshPhysicalMaterial({color:0x2a5aff, transparent:true, opacity:0.35, roughness:0.1, metalness:0, transmission:0.4}));
-    glass.position.set(1.35, 1.24, 1.55); tank.add(glass);
+    glass.position.set(BAR_W/2-1.2, 1.24, 1.55); tank.add(glass);
     const tankLight = new THREE.PointLight(0x6a4aff, 1.3, 2.4, 2);
-    tankLight.position.set(1.35, 1.24, 1.55); tank.add(tankLight);
+    tankLight.position.set(BAR_W/2-1.2, 1.24, 1.55); tank.add(tankLight);
     bar.add(tank);
     g.add(bar);
   }
@@ -737,6 +880,31 @@ function buildRoadhouseBar(){
     }
   }
 
+  // a couple of small, shady framed pictures — cheap canvas-drawn silhouette
+  // portraits in mismatched frames, exactly the kind of thing nobody in the
+  // room could actually explain if you asked about them
+  const framedPicture = (ang, inset, y, tint)=>{
+    const cv = document.createElement("canvas"); cv.width = 96; cv.height = 128;
+    const cx = cv.getContext("2d");
+    cx.fillStyle = `#${tint.toString(16).padStart(6,"0")}`; cx.fillRect(0,0,96,128);
+    cx.fillStyle = "rgba(0,0,0,.55)";
+    cx.beginPath(); cx.ellipse(48,50,22,28,0,0,Math.PI*2); cx.fill(); // head silhouette
+    cx.beginPath(); cx.ellipse(48,118,38,34,0,Math.PI,0); cx.fill(); // shoulders
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const p = wallPoint(ang, inset);
+    const pic = new THREE.Mesh(new THREE.PlaneGeometry(0.32,0.42),
+      new THREE.MeshStandardMaterial({map:tex, roughness:0.85}));
+    pic.position.set(p.x, y, p.z); pic.rotation.y = ang + Math.PI; pic.rotation.z = (Math.random()-0.5)*0.1;
+    const frameMat = new THREE.MeshStandardMaterial({color:0x1c130a, roughness:0.8});
+    for(const [fw,fh,fx,fy] of [[0.38,0.05,0,0.235],[0.38,0.05,0,-0.235],[0.05,0.5,-0.185,0],[0.05,0.5,0.185,0]]){
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(fw,fh,0.03), frameMat);
+      bar.position.set(fx,fy,0.015); pic.add(bar);
+    }
+    g.add(pic);
+  };
+  framedPicture(0.5, 0.15, 2.15, 0x4a3828);
+  framedPicture(3.35, 0.15, 2.05, 0x2e3a2e);
+
   // leather booth against the right wall
   {
     const ang = 1.2, p = wallPoint(ang, 0.55);
@@ -751,8 +919,10 @@ function buildRoadhouseBar(){
     g.add(booth);
   }
 
-  // low wooden cocktail tables with a worn stool each
-  const cocktail = (ang, inset)=>{
+  // low wooden cocktail tables, each with a worn stool — one of them tipped
+  // over, because a real dive bar's furniture doesn't all stand up straight
+  const cocktailSpots = [];
+  const cocktail = (ang, inset, toppleStool=false)=>{
     const p = wallPoint(ang, inset), grp = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.04, 14), steel);
     base.position.y = 0.02; grp.add(base);
@@ -764,11 +934,19 @@ function buildRoadhouseBar(){
     g.add(grp);
     const stool = makeStool(0x241812);
     const sp = wallPoint(ang + 0.09, inset - 0.35);
-    stool.position.copy(sp);
+    if(toppleStool){
+      stool.position.set(sp.x, 0.19, sp.z);
+      stool.rotation.z = Math.PI/2 - 0.15;
+      stool.rotation.y = Math.random()*6.28;
+    } else {
+      stool.position.copy(sp);
+    }
     g.add(stool);
+    cocktailSpots.push({x:p.x, z:p.z});
   };
   cocktail(2.55, 1.9);
-  cocktail(3.9, 1.9);
+  cocktail(3.9, 1.9, true);
+  cocktail(4.4, 2.3);
 
   // hanging pendant lamps — a big warm cone shade near the player (the
   // reference's foreground lamp) plus smaller ones scattered over seating
@@ -801,13 +979,56 @@ function buildRoadhouseBar(){
     pendant(pc.x, pc.z, 2.45, 0.26, false);
     const pd = wallPoint(3.9, 1.9);
     pendant(pd.x, pd.z, 2.45, 0.26, true);
+    const pe = wallPoint(4.4, 2.3);
+    pendant(pe.x, pe.z, 2.4, 0.26, false);
   }
 
   scene.add(g);
   enableShadow(g);
-  return g;
+  return { group:g, cocktailSpots };
 }
-buildRoadhouseBar();
+const roadhouse = buildRoadhouseBar();
+
+/* ---- background life: a bartender actually working the bar, and a couple
+   of silhouette patrons occupying the tables scattered through the room —
+   the space read as empty before because nobody was ever in it besides the
+   four seats at the game's own table. These are pure atmosphere: no AI, no
+   interaction, just idle motion so the room doesn't feel frozen. */
+const bgFigures = [];
+function buildBackgroundLife(){
+  // the bartender: stands roughly centered behind the long counter, given
+  // a slightly taller/broader placeholder build to read as "on duty"
+  {
+    const bt = placeholderChar(0x5a4432);
+    bt.scale.set(1.05, 1.1, 1.05);
+    const bp = wallPoint(BAR_ANGLE, 0.65); // between the wall shelf and the counter
+    bt.position.set(bp.x, 0, bp.z);
+    bt.rotation.y = BAR_ANGLE + Math.PI + (Math.random()-0.5)*0.3;
+    scene.add(bt);
+    enableShadow(bt);
+    // the counter's own front-facing lights don't reach behind it — without
+    // a light of its own the bartender was correctly positioned but totally
+    // unlit, invisible against the shelf shadow
+    const btLight = new THREE.PointLight(0xffb060, 1.4, 3, 1.8);
+    btLight.position.set(bp.x, 1.6, bp.z);
+    scene.add(btLight);
+    bgFigures.push({ obj:bt, phase:Math.random()*6.28, bob:0.012, baseY:0 });
+  }
+  // silhouette patrons seated at the cocktail tables and the booth — dim,
+  // low-detail figures that read as "someone's there" without competing
+  // for attention with the actual players at the game table
+  for(const spot of roadhouse.cocktailSpots){
+    const p = placeholderChar(0x201812);
+    p.scale.set(0.92, 0.78, 0.92); // seated proportions — squashed a bit
+    const dx = -spot.x*0.12, dz = -spot.z*0.12; // sit slightly off-center from the table
+    p.position.set(spot.x+dx, 0.42, spot.z+dz);
+    p.rotation.y = Math.atan2(-spot.x, -spot.z) + (Math.random()-0.5)*1.2;
+    scene.add(p);
+    enableShadow(p);
+    bgFigures.push({ obj:p, phase:Math.random()*6.28, bob:0.006, baseY:0.42 });
+  }
+}
+buildBackgroundLife();
 
 /* ---------------- game mode: how many chairs at the table ----------------
    Classic = you + 3 NPCs (the original, tightly-tuned layout). Full House =
@@ -2132,6 +2353,12 @@ function update(dt){
   // ambient life: the ceiling fan turns lazily, the neon sign mostly holds
   // steady but occasionally stutters like a real tube running low
   if(ceilingFan) ceilingFan.rotation.y += dt*0.0011;
+  // background bartender/patrons: a slow idle bob, nothing more — pure
+  // ambient life, not part of the game's own actor/AI system
+  for(const f of bgFigures){
+    f.phase += dt*0.0011;
+    f.obj.position.y = f.baseY + Math.sin(f.phase)*f.bob;
+  }
   if(neonSignMat){
     const stutter = (Math.sin(clock.t*0.0027)>0.982) ? 0.15+rng()*0.3 : 1;
     neonSignMat.emissiveIntensity = stutter;
