@@ -703,7 +703,6 @@ export const NPCS = [
 export const RULES = {
   seats: 4,
   maxRounds: 4,
-  voteUnlockRound: 2,
   handSize: 4,
   weights: { obvious:3, medium:2, subtle:1 },
 };

@@ -1220,30 +1220,25 @@ async function loseChipsToTable(seat){
   await Promise.all(survivors.map((s,idx)=> flyChips(seat, s, amounts[idx])));
   survivors.forEach((s,idx)=>{ chipCounts[s]+=amounts[idx]; rebuildChipStack(s); });
 }
-/* the table wrongly condemned an innocent seat this round — everyone who
-   voted for that innocent seat forfeits a quarter of their current stake
-   (min 3), split across everyone who didn't vote for them. A cost for
-   careless/wrong accusations without the swinginess of instant death. */
-async function penalizeWrongVoters(wrongVoters){
-  const correctVoters = aliveSeats().filter(s=>!wrongVoters.includes(s));
-  if(!correctVoters.length) return;
+/* the table wrongly executed an innocent seat this round — every voter who
+   picked them pays a flat, modest fine straight to the seat they wrongly
+   killed (not spread across the table). Table chips can go negative here;
+   that's fine, it's just a per-match number that nets against the bank at
+   match end (see bankTableResult) — a small, regular cost rather than
+   something that wipes a seat out. */
+const WRONG_VOTE_FINE = 5;
+async function punishWrongVoters(wrongVoters, victim){
   const flights = [];
+  let total = 0;
   for(const w of wrongVoters){
-    const total = chipCounts[w];
-    const penalty = Math.min(total, Math.max(3, Math.round(total*0.25)));
-    if(penalty<=0) continue;
-    chipCounts[w] -= penalty;
+    chipCounts[w] -= WRONG_VOTE_FINE;
     rebuildChipStack(w);
-    const each = Math.floor(penalty/correctVoters.length);
-    let remainder = penalty - each*correctVoters.length;
-    correctVoters.forEach((s,idx)=>{
-      const amt = each + (idx<remainder?1:0);
-      chipCounts[s]+=amt;
-      flights.push(flyChips(w, s, amt));
-    });
+    total += WRONG_VOTE_FINE;
+    flights.push(flyChips(w, victim, WRONG_VOTE_FINE));
   }
   await Promise.all(flights);
-  correctVoters.forEach(s=>rebuildChipStack(s));
+  chipCounts[victim] += total;
+  rebuildChipStack(victim);
   setBanner(STR.wrong_vote_penalty, 2000);
   await sleep(1200);
 }
@@ -1437,7 +1432,7 @@ function flash(){ const f=$("flash"); f.style.transition="none"; f.style.opacity
 const G = {
   phase:"title", card:null, imposterSeat:-1, round:1, maxRounds:RULES.maxRounds,
   usedWords:new Set(), spoken:ALL_SEATS.map(()=>[]), suspicion:null, heat:new Array(SEAT_COUNT).fill(0),
-  heardCrewWords:0, voteCalled:false, extraRound:false, over:false,
+  heardCrewWords:0, extraRound:false, over:false,
 };
 
 /* ---------------- casino coins: the player's persistent bank ----
@@ -1467,13 +1462,12 @@ function newMatch(){
   G.imposterSeat = Math.floor(rng()*SEAT_COUNT);
   G.round = 1; G.maxRounds = RULES.maxRounds;
   G.usedWords = new Set(); G.spoken=ALL_SEATS.map(()=>[]);
-  G.heat=new Array(SEAT_COUNT).fill(0); G.heardCrewWords=0; G.voteCalled=false; G.extraRound=false; G.over=false;
+  G.heat=new Array(SEAT_COUNT).fill(0); G.heardCrewWords=0; G.extraRound=false; G.over=false;
   clueBought = new Array(SEAT_COUNT).fill(false);
-  // escalating difficulty from wrong votes: each wrong voter permanently
-  // loses a word option, a wrongly-accused survivor sits out their next
-  // round, and the imposter banks a free real word — see doVote()
+  // escalating difficulty from wrong votes: every voter who picked the
+  // wrongly-executed seat permanently loses two word options, and the
+  // imposter banks a free real word — see doVote()
   G.handPenalty = new Array(SEAT_COUNT).fill(0);
-  G.skipTurn = new Array(SEAT_COUNT).fill(false);
   G.impBonusClues = 0;
   // per-observer suspicion matrix (crew NPCs only use their own row)
   G.suspicion = ALL_SEATS.map(()=>new Array(SEAT_COUNT).fill(0));
@@ -1508,7 +1502,7 @@ function crewHand(seat=0){
 function imposterHand(seat=0){
   const size = handSizeFor(seat);
   const b=shuffle(unused(G.card.bluff)).map(w=>({w,tier:"bluff"}));
-  const learnedUnlocked = Math.floor(G.heardCrewWords/3) + (G.impBonusClues||0);
+  const learnedUnlocked = Math.floor(G.heardCrewWords/2) + (G.impBonusClues||0);
   const learned = shuffle(unused(G.card.subtle.concat(G.card.medium))).slice(0,learnedUnlocked)
     .map(w=>({w,tier:"bluff"}));
   return shuffle(learned.concat(b)).slice(0,size);
@@ -1543,7 +1537,12 @@ function npcPickWord(seat){
 function registerWord(seat, w){
   G.usedWords.add(w); G.spoken[seat].push(w);
   if(seat!==G.imposterSeat) G.heardCrewWords++;
-  // every alive crew NPC updates its suspicion of `seat`
+  // every alive crew NPC updates its suspicion of `seat`. These constants
+  // were tuned down from a simulated baseline where a bluff word was such
+  // a strong, near-noiseless signal that the imposter's cumulative
+  // suspicion/heat over 4 rounds made them identifiable ~99.8% of the time
+  // on the very first vote — the deduction barely mattered. Softened so a
+  // bluff is still risky but not an automatic tell.
   const weight = G.wordWeight[w];
   for(const o of aliveSeats()){
     if(o===0 || o===seat) continue;
@@ -1552,15 +1551,15 @@ function registerWord(seat, w){
       continue;
     }
     let d;
-    if(weight===undefined) d = 1.7;            // unknown word — smells like a bluff
+    if(weight===undefined) d = 0.55;           // unknown word — smells like a bluff
     else if(weight===3)    d = -1.2;           // proves knowledge (and leaks it)
     else if(weight===2)    d = -0.4;
     else                   d = 0.35;           // safe but slippery
-    d += (rng()-0.5)*0.4;
+    d += (rng()-0.5)*0.5;
     G.suspicion[o][seat] += d;
   }
   // public heat: rough table-wide read (drives glances + imposter votes)
-  if(weight===undefined) G.heat[seat]+=1.4; else G.heat[seat]+= weight===1?0.35:weight===2?-0.3:-0.9;
+  if(weight===undefined) G.heat[seat]+=0.8; else G.heat[seat]+= weight===1?0.35:weight===2?-0.3:-0.9;
 }
 
 /* ---------- voting AI ---------- */
@@ -1574,7 +1573,7 @@ function npcVote(o){
   const npc=actors[o].npc;
   let best=targets[0], bs=-1e9;
   for(const t of targets){
-    const s = G.suspicion[o][t] + G.heat[t]*npc.aggression*0.4 + rng()*0.5;
+    const s = G.suspicion[o][t] + G.heat[t]*npc.aggression*0.3 + rng()*0.5;
     if(s>bs){bs=s;best=t;}
   }
   return best;
@@ -1600,17 +1599,8 @@ function offerHand(hand){
     G._handInject = h=>done(h);
   });
 }
-function offerCallVote(){
-  const act=$("actions"); act.innerHTML="";
-  if(G.round>=RULES.voteUnlockRound && !G.voteCalled){
-    const b=document.createElement("button"); b.className="ghostBtn"; b.textContent=STR.call_vote;
-    b.onclick=()=>{ G.voteCalled=true; act.innerHTML=""; if(G._handCancel) G._handCancel(); };
-    act.appendChild(b);
-  }
-}
 /* imposter-only: spend table chips for a guaranteed real word, on demand,
-   instead of waiting on the passive heardCrewWords-based unlock. Appends
-   to #actions without clearing it, so it can sit beside Call the Vote. */
+   instead of waiting on the passive heardCrewWords-based unlock. */
 function offerClueButton(){
   if(clueBought[0] || chipCounts[0] < CLUE_COST) return;
   if(!unused(G.card.subtle.concat(G.card.medium)).length) return;
@@ -1744,7 +1734,7 @@ function glanceAt(observer, target){
 // axis-detection in layFlat can't tell barrel from grip on its own). If
 // the gun ever aims exactly backward again, this is the one thing to flip.
 const GUN_BARREL_SIGN = 1;
-async function executeSeat(victim){
+async function executeSeat(victim, wasImp){
   play("drum");
   // revolver rises and aims
   const target = victim===0 ? new THREE.Vector3(0,1.25,1.3) : SEATS[victim].pos.clone().setY(1.25);
@@ -1770,122 +1760,18 @@ async function executeSeat(victim){
   await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 1000); // slow level lift
   await tweenTo(revolver, up, {x:aimEuler.x, y:aimEuler.y, z:aimEuler.z}, 700); // swing onto the target
   await sleep(900);                                                      // the dramatic pause
-  
-  // ----- NEW: PROVE INNOCENCE BY TYPING -----
-  const isPlayer = victim === 0;
-  const secretWord = G.card.secret;
-  let attempts = 0;
-  const maxAttempts = 2;
-  let provedInnocent = false;
-  
-  if (isPlayer) {
-    // Player was voted out — they must type the secret word
-    setPrompt(STR.proveword_prompt);
 
-    // Create input field
-    const input = document.createElement("input");
-    input.type = "text";
-    input.id = "wordInput";
-    input.placeholder = STR.proveword_placeholder;
-    input.style.cssText = "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding:12px 20px; font-size:24px; border:2px solid #7a2e22; border-radius:8px; background:#1a100a; color:#efe3c0; text-align:center; z-index:100; width:300px;";
+  // the majority vote is final — whoever's picked is out, guilty or not.
+  // No more "prove innocence" roll or typing check (see doVote for the
+  // separate consequences dealt to the table when the vote turns out to
+  // have been wrong).
+  play("shot");
+  flash();
+  gunKick();
+  actors[victim].alive = false;
+  await loseChipsToTable(victim);
+  await sleep(wasImp ? 3000 : 2000);
 
-    const confirmBtn = document.createElement("button");
-    confirmBtn.textContent = STR.confirm_btn;
-    confirmBtn.style.cssText = "position:absolute; top:calc(50% + 60px); left:50%; transform:translateX(-50%); padding:10px 40px; font-size:20px; background:#7a2e22; color:#efe3c0; border:none; border-radius:8px; cursor:pointer; z-index:100;";
-    
-    document.body.appendChild(input);
-    document.body.appendChild(confirmBtn);
-    input.focus();
-    
-    const checkWord = async () => {
-      const typed = input.value.trim().toLowerCase();
-      const correct = secretWord.toLowerCase();
-      const isClose = (a, b) => {
-        // Simple fuzzy match: check if typed contains correct or vice versa
-        if (a.includes(b) || b.includes(a)) return true;
-        // Levenshtein-like: check if 80% similar
-        let matches = 0;
-        const maxLen = Math.max(a.length, b.length);
-        for (let i = 0; i < Math.min(a.length, b.length); i++) {
-          if (a[i] === b[i]) matches++;
-        }
-        return (matches / maxLen) > 0.7;
-      };
-      
-      if (typed === correct || isClose(typed, correct)) {
-        provedInnocent = true;
-        input.remove();
-        confirmBtn.remove();
-        setBanner(STR.banner_proved_innocent_you, 2000);
-        setPrompt(STR.prompt_proved_innocent_you);
-        play("click");
-        // Player survives — keep them alive
-        actors[victim].alive = true;
-        resolveVote("innocent");
-      } else {
-        attempts++;
-        if (attempts >= maxAttempts) {
-          input.remove();
-          confirmBtn.remove();
-          setBanner(fmt(STR.banner_proved_wrong_final,{w:secretWord}), 3000);
-          setPrompt(STR.prompt_proved_failed_you);
-          play("shot");
-          flash();
-          gunKick();
-          actors[victim].alive = false;
-          await loseChipsToTable(victim);
-          resolveVote("guilty");
-        } else {
-          setPrompt(fmt(STR.prompt_proved_wrong_retry,{n:maxAttempts-attempts}));
-          input.value = "";
-          input.focus();
-          play("click");
-        }
-      }
-    };
-
-    confirmBtn.onclick = checkWord;
-    input.onkeydown = (e) => { if (e.key === "Enter") checkWord(); };
-
-    // Wait for resolution (the resolveVote function will continue)
-    await new Promise(res => window._resolveVote = res);
-  } else {
-    // NPC was voted out — they must type the secret word (simulated)
-    setPrompt(fmt(STR.prompt_proving_npc,{n:nameOf(victim)}));
-    await sleep(1000);
-
-    const npc = actors[victim];
-    const isImp = victim === G.imposterSeat;
-    let guessedCorrect = false;
-
-    if (isImp) {
-      // Imposter has a small chance to guess correctly (based on how many crew words they've heard)
-      const chance = Math.min(0.15 + G.heardCrewWords * 0.05, 0.5);
-      if (rng() < chance) {
-        guessedCorrect = true;
-      }
-    } else {
-      // Crew always knows the word
-      guessedCorrect = true;
-    }
-
-    if (guessedCorrect) {
-      setBanner(fmt(STR.banner_proved_innocent_npc,{n:nameOf(victim)}), 2500);
-      setPrompt(fmt(STR.prompt_proved_innocent_npc,{n:nameOf(victim)}));
-      actors[victim].alive = true;
-      await sleep(2500);
-    } else {
-      setBanner(fmt(STR.banner_proved_imposter_npc,{n:nameOf(victim)}), 3000);
-      setPrompt(fmt(STR.prompt_proved_failed_npc,{n:nameOf(victim)}));
-      play("shot");
-      flash();
-      gunKick();
-      actors[victim].alive = false;
-      await loseChipsToTable(victim);
-      await sleep(3000);
-    }
-  }
-  
   // settle back down to the table, flat
   await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 450);
   await tweenTo(revolver, revolverHome, {x:0, y:rng()*6.28, z:0}, 800);
@@ -1895,14 +1781,6 @@ async function gunKick(){
   const p0=revolver.position.clone();
   await tweenTo(revolver, p0.clone().add(new THREE.Vector3(0,0.07,0)), {x:r0.x-0.4, y:r0.y, z:r0.z}, 70);
   await tweenTo(revolver, p0, r0, 280);
-}
-
-// Helper function to resolve vote
-function resolveVote(result) {
-  if (window._resolveVote) {
-    window._resolveVote();
-    window._resolveVote = null;
-  }
 }
 
 /* ---------------- chairs ---------------- */
@@ -2074,18 +1952,12 @@ async function runMatch(){
   matchLoop:
   while(!G.over){
     $("roundTag").textContent = fmt(STR.round_tag,{r:G.round,max:G.maxRounds});
-    // ---- word round ----
+    // ---- word round: everyone speaks every round, no early vote — the
+    // table always plays out the full RULES.maxRounds before deciding ----
     for(const seat of aliveSeats()){
-      if(G.voteCalled) break;
-      if(G.skipTurn[seat]){
-        G.skipTurn[seat] = false;
-        setBanner(seat===0 ? STR.skip_turn_you : fmt(STR.skip_turn_npc,{n:nameOf(seat)}), 1800);
-        await sleep(1800);
-        continue;
-      }
       if(seat===0){
         setPrompt(STR.prompt_your_turn);
-        offerCallVote();
+        $("actions").innerHTML="";
         const isImp = G.imposterSeat===0;
         if(isImp) offerClueButton();
         const h = await offerHand(isImp ? imposterHand() : crewHand());
@@ -2111,14 +1983,12 @@ async function runMatch(){
         }
       }
     }
-    // ---- vote? ----
-    const forced = G.round>=G.maxRounds;
-    if(forced || G.voteCalled){
+    // ---- vote: only once the full round count is played ----
+    if(G.round>=G.maxRounds){
       const result = await doVote();
       if(G.over) break matchLoop;
-      G.voteCalled=false;
       if(result==="tie"){ G.round = G.maxRounds; }      // one more word round, then re-vote
-      else { G.round=1; G.maxRounds=3; }                // survivors play shorter cycles
+      else { G.round=1; G.maxRounds=RULES.maxRounds; }  // always a fresh full 4-round cycle
     } else {
       G.round++;
     }
@@ -2163,27 +2033,29 @@ async function doVote(){
     return "tie";
   }
   const victim=top[0];
+  const wasImp = victim===G.imposterSeat;
   clearTray();
   setBanner(victim===0?STR.banner_you_shot:fmt(STR.banner_shot,{n:nameOf(victim)}), 2400);
-  await executeSeat(victim);
-  const died = !actors[victim].alive;
-  const wasImp = victim===G.imposterSeat;
+  // the majority vote is final now — whoever's picked is out, guilty or
+  // not. No more "prove innocence" chance: being wrongly accused is a
+  // real, permanent cost, not something you can roll your way out of.
+  await executeSeat(victim, wasImp);
   setBanner(fmt(wasImp?STR.banner_was_imposter:STR.banner_was_innocent,{n:nameOf(victim)}), 2200);
   if(victim!==0){ const p=plateEls[victim]; if(p) p.classList.add("dead"); }
   await sleep(2300);
-  resolveBet(bet, victim, died);
+  resolveBet(bet, victim, true);
   if(bet) await sleep(2000);
-  // the table just wrongly condemned an innocent seat — everyone who voted
-  // for them pays in chips AND in judgment (one fewer word option, for the
-  // rest of the match), the innocent victim is too shaken to speak next
-  // round, and the imposter walks away from the table's mistake smarter
+  // the table just wrongly executed an innocent seat. Every voter who
+  // picked them permanently loses two word options, and the chips they're
+  // fined go entirely to the seat they wrongly killed — small, regular
+  // compensation, not spread out to the rest of the table. The imposter
+  // also walks away from the table's mistake with a free real word.
   if(!wasImp){
     const wrongVoters = Object.keys(chosenBy).filter(s=>+chosenBy[s]===victim).map(Number);
     if(wrongVoters.length){
-      for(const w of wrongVoters) G.handPenalty[w]++;
-      await penalizeWrongVoters(wrongVoters);
+      for(const w of wrongVoters) G.handPenalty[w]+=2;
+      await punishWrongVoters(wrongVoters, victim);
     }
-    if(!died) G.skipTurn[victim] = true;
     G.impBonusClues = (G.impBonusClues||0) + 1;
   }
   // outcomes
