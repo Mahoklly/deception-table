@@ -512,7 +512,7 @@ function buildRoom(){
   // bar canopy: it only reads from nearby, exactly like a real hung sign
   {
     const signMat = new THREE.MeshStandardMaterial({color:0x0a0705, roughness:0.6, emissive:0x000000});
-    applyOnceTexKeyed(signMat, "tex_neon_bar","tex_neon_bar.jpg");
+    applyOnceTexKeyed(signMat, "tex_neon_bar","tex_neon_bar.png", 1, 100);
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.1), signMat);
     // the wall segments are 0.28 thick, centered on the room radius, so
     // their inner face sits at ROOM_R-0.14 — mounting the sign at exactly
@@ -1401,17 +1401,8 @@ function headScreenPos(i, yOff=1.62){
   return { x:(v.x*0.5+0.5)*innerWidth, y:(-v.y*0.5+0.5)*innerHeight, behind:v.z>1 };
 }
 function clampBubblePos(p){
-  let x = Math.min(Math.max(p.x, 150), innerWidth-150);
-  let y = Math.max(p.y, 96);
-  const cardEl = $("myCard");
-  if (cardEl && cardEl.style.display !== "none"){
-    const c = cardEl.getBoundingClientRect();
-    // bubble occupies roughly x±150 horizontally and up to ~110px above y
-    if (x + 150 > c.left - 12 && y - 100 < c.bottom + 12){
-      x = c.left - 170;
-      if (x < 150){ x = 150; y = Math.max(y, c.bottom + 110); }
-    }
-  }
+  const x = Math.min(Math.max(p.x, 150), innerWidth-150);
+  const y = Math.max(p.y, 96);
   return {x, y};
 }
 function showBubble(i, who, text, ms){
@@ -1479,9 +1470,6 @@ function newMatch(){
   for(const w of G.card.medium)  G.wordWeight[w]=RULES.weights.medium;
   for(const w of G.card.subtle)  G.wordWeight[w]=RULES.weights.subtle;
 }
-
-/* ---------- card HUD ---------- */
-function setupCardHUD(){ const c=$("myCard"); if(c) c.style.display="none"; }
 
 /* ---------- word AI ---------- */
 function unused(list){ return list.filter(w=>!G.usedWords.has(w)); }
@@ -1957,10 +1945,8 @@ renderer.domElement.addEventListener("pointerdown", e=>{
 /* ---------------- match flow ---------------- */
 async function runMatch(){
   newMatch();
-  setupCardHUD();
   await dealCardsSequence();
   setBanner("", 1);
-  $("myCard").style.display="block";
   let order = aliveSeats();
 
   matchLoop:
@@ -2101,7 +2087,6 @@ function endMatch(kind){
   $("startBtn").textContent=STR.play_again;
   $("loadNote").textContent="";
   t.classList.remove("hidden");
-  $("myCard").style.display="none";
 }
 
 /* ---------------- fixed-timestep loop ---------------- */
@@ -2132,9 +2117,14 @@ function update(dt){
     a.slump += (targetSlump-a.slump)*0.03;
     a.glance = Math.max(0, a.glance - dt*0.0007);
     const g = a.glance>0 ? Math.sin(Math.min(1,a.glance)*Math.PI)*a.glanceDir*0.55 : 0;
-    a.inner.rotation.x = a._leanCur + a.slump*1.15 + breatheAmt*0.4;
+    // a dead seat's "slump" used to pitch forward 1.15rad (~66°) and sink
+    // 0.35 units — enough to rotate/drop the body down into (and behind)
+    // the table geometry from most camera angles instead of reading as
+    // "gone limp in their chair". Toned down to a believable head-down
+    // slump that stays above the tabletop.
+    a.inner.rotation.x = a._leanCur + a.slump*0.45 + breatheAmt*0.4;
     a.inner.rotation.y = g;
-    a.inner.position.y = (a.baseY||0) - a.slump*0.35;
+    a.inner.position.y = (a.baseY||0) - a.slump*0.1;
     a.inner.scale.y = a.inner.scale.x * (1+breatheAmt); // uses normalize's uniform scale as base
   }
   // candle flicker
@@ -2185,7 +2175,6 @@ function frame(now){
 
 /* ---------------- boot ---------------- */
 applyStaticStrings();
-$("myCard").style.display="none";
 $("roundTag").textContent="";
 loadWorld().then(()=>{ $("loadNote").textContent=""; });
 $("startBtn").onclick = ()=>{

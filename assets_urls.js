@@ -4,7 +4,7 @@ export const ASSET_URLS = {
   room_tavern: "", // hook up a Higgsfield-generated room_tavern.glb here to replace the procedural box/beam room
   tex_wood_wall: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_073440_49fc9b5f-1b93-4009-b898-7ad36e0b8792.png",
   tex_wood_floor: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_073441_5f8da4b4-6709-43f4-8cd0-eeb4d8028521.png",
-  tex_neon_bar: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_105231_b061d7a3-7516-4fe1-9f81-394ab01c2b43.png",
+  tex_neon_bar: "", // served locally from ./assets/tex_neon_bar.png — the CDN copy doesn't allow cross-origin pixel reads, which silently broke the transparency cutout (applyOnceTexKeyed) and left the dark background opaque; same-origin local file fixes that
   tex_graffiti_mural: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_210136_67301b60-ed0f-487e-a8c9-c69c23cdc6e8.png",
   tex_posters: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_210139_3d6d33c5-4917-4ccd-9cbc-1d0849b1c0f0.png",
   tex_backlit_shelf: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070850_0061aa79-f789-4303-bae7-1b86b7bef554.png",
@@ -15,7 +15,7 @@ export const ASSET_URLS = {
   char_hawk: "", // Full House mode's 4th NPC (Deacon Rourke) — drop a Meshy-generated char_hawk.glb URL here; falls back to a procedural placeholder capsule until then
   char_crow: "", // Full House mode's 5th NPC (Old Ma Kessler) — same deal, drop a char_crow.glb URL here
   table_tavern: "", // old table retired — using the new procedural poker-table design (makePokerTable in game.js) until a fresh GLB is hooked up here
-  revolver: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/bafac26e-ea37-4b1d-9c01-eff43afd449c.glb", // the original real GLB — brought back, procedural version wasn't good enough
+  revolver: "", // now served locally from ./assets/revolver.glb (the user pushed the real file to the repo) instead of depending on the CDN
   ref_table: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070848_b5c9817c-c548-4b79-b5ca-0708a1f606a3.png", // reference photo for Meshy image-to-3D — run this through Meshy yourself, send back the .glb URL
   ref_revolver: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070849_d963749d-ba20-4cbe-b622-05cb9c8f5b7c.png", // reference photo for Meshy image-to-3D
   ref_bartender: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070844_a28fc51a-6d58-4488-bc91-35dce5fcd390.png", // reference photo for Meshy image-to-3D
