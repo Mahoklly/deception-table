@@ -3,9 +3,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/addons/GLTFLoader.js";
 import { MeshoptDecoder } from "./vendor/addons/libs/meshopt_decoder.module.js";
-import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260719a";
-import { DECK, NPCS, RULES } from "./data.js?v=20260719a";
-import { ASSET_URLS } from "./assets_urls.js?v=20260719a";
+import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260719b";
+import { DECK, NPCS, RULES } from "./data.js?v=20260719b";
+import { ASSET_URLS } from "./assets_urls.js?v=20260719b";
 const assetSrc = (key, rel) => ASSET_URLS[key] || ("./assets/"+rel);
 
 /* ---------------- seeded RNG (determinism §12.1) ---------------- */
@@ -1009,7 +1009,10 @@ function buildBackgroundLife(){
     bt.name = "bartender";
     bt.scale.set(1.05, 1.1, 1.05);
     const bp = wallPoint(BAR_ANGLE, 0.95); // in the aisle between the shelf unit and the counter
-    bt.position.set(bp.x, 0, bp.z);
+    const BAR_TENDER_X_OFFSET = -1.7; // dead-center (x=0) sits directly behind Madame Vey's seat on the
+      // player's own sightline across the table — she fully blocks him from the player's view. Off to
+      // one side he's clear of her and still well inside the counter/shelf span.
+    bt.position.set(bp.x + BAR_TENDER_X_OFFSET, 0, bp.z);
     bt.rotation.y = wallRot(BAR_ANGLE) + (Math.random()-0.5)*0.2; // facing the game table
     scene.add(bt);
     enableShadow(bt);
@@ -1017,7 +1020,7 @@ function buildBackgroundLife(){
     // a light of its own the bartender was correctly positioned but totally
     // unlit, invisible against the shelf shadow
     const btLight = new THREE.PointLight(0xffb060, 1.4, 3, 1.8);
-    btLight.position.set(bp.x, 1.6, bp.z);
+    btLight.position.set(bp.x + BAR_TENDER_X_OFFSET, 1.6, bp.z);
     scene.add(btLight);
     bgFigures.push({ obj:bt, phase:Math.random()*6.28, bob:0.012, baseY:0 });
   }
@@ -1549,7 +1552,7 @@ function restAllGuns(){
   }
 }
 async function loadWorld(){
-  const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun, gShelf, gBartender, gBgTable] = await Promise.all([
+  const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun, gShelf, gBartender, gBgTable, gBarStool] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
     loadGLB("table_tavern","table_tavern.glb"), loadGLB("char_brute","char_brute.glb"),
     loadGLB("char_widow","char_widow.glb"), loadGLB("char_fox","char_fox.glb"),
@@ -1559,6 +1562,7 @@ async function loadWorld(){
     loadGLB("liquor_shelf","liquor_shelf.glb"),
     loadGLB("bartender","bartender.glb"),
     loadGLB("bg_table","bg_table.glb"),
+    loadGLB("bar_stool","bar_stool.glb"),
   ]);
   // ---- Meshy-generated set dressing: each of these swaps out a procedural
   // stand-in built in buildRoadhouseBar()/buildBackgroundLife(). The
@@ -1629,6 +1633,24 @@ async function loadWorld(){
       inst.position.y = 0.62*0.81;
       tbl.add(inst);
       enableShadow(tbl);
+    }
+  }
+  if(gBarStool){
+    // real bar stool replaces every procedural one — at the counter and at
+    // each cocktail table. Also shipped untextured, so a dark leather/wood
+    // tint in code, matching the old procedural stool colors.
+    const stoolMat = new THREE.MeshStandardMaterial({color:0x33200f, roughness:0.7, metalness:0.1});
+    gBarStool.traverse(o=>{ if(o.isMesh) o.material = stoolMat; });
+    const S = 0.68/1.9; // model is 1.9 units tall, centered at origin → scale to a real stool's ~0.68m seat height
+    const stoolTargets = [];
+    scene.traverse(o=>{ if(o.name==="barStool") stoolTargets.push(o); });
+    for(const st of stoolTargets){
+      st.clear();
+      const inst = gBarStool.clone(true);
+      inst.scale.setScalar(S);
+      inst.position.y = 0.95*S;
+      st.add(inst);
+      enableShadow(st);
     }
   }
   // swap the procedural box/beam room for a Higgsfield-generated one, if hooked up
@@ -2148,6 +2170,7 @@ function makeChair(){
    (default worn wood, or red vinyl for the cyberpunk-bar rows) */
 function makeStool(seatColor=0x3a2818){
   const g = new THREE.Group();
+  g.name = "barStool";
   const seatMat = new THREE.MeshStandardMaterial({color:seatColor, roughness:0.6});
   const iron = new THREE.MeshStandardMaterial({color:0x2c2c2e, roughness:0.5, metalness:0.6});
   const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.19,0.19,0.05,16), seatMat);
