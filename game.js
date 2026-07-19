@@ -1543,45 +1543,6 @@ function restAllGuns(){
     tweenTo(gun, gun.userData.rest.pos, gun.userData.rest.rot, 550);
   }
 }
-/* ---- arms on the table: every seat keeps both hands visible ----
-   The character models are static meshes (no arm bones to pose), so the
-   "hand on the gun" is built as real procedural geometry: a sleeved
-   forearm sloping from each figure's shoulder down onto the felt — one
-   hand cupped over their revolver's grip, the free hand resting flat on
-   the table on the other side. The player's seat gets the same pair, so
-   your own hands are visible at the bottom edge in first person. */
-function buildSeatArms(){
-  const sleeve = new THREE.MeshStandardMaterial({color:0x2f2218, roughness:0.9});
-  const skin   = new THREE.MeshStandardMaterial({color:0xcfae87, roughness:0.8});
-  const mkArm = (from, to)=>{
-    const dir = to.clone().sub(from), len = dir.length();
-    const arm = new THREE.Group();
-    const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.05, len, 8), sleeve);
-    limb.position.y = len/2; arm.add(limb);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), skin);
-    hand.scale.set(1, 0.55, 1.25);
-    hand.position.y = len; arm.add(hand);
-    arm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
-    arm.position.copy(from);
-    enableShadow(arm);
-    scene.add(arm);
-  };
-  for(const i of ALL_SEATS){
-    const seat = SEATS[i];
-    const dirOut = seat.pos.clone().setY(0).normalize();
-    const perp = new THREE.Vector3(-dirOut.z, 0, dirOut.x);
-    const shoulderBase = seat.pos.clone().setY(1.02).add(dirOut.clone().multiplyScalar(-0.08));
-    // gun hand — comes down over the revolver's grip (same side buildSeatGuns
-    // parks the gun on: the -perp side of the seat)
-    const gunHand = seatGuns[i]
-      ? seatGuns[i].userData.rest.pos.clone().add(new THREE.Vector3(0, 0.045, 0))
-      : dirOut.clone().multiplyScalar(0.82).add(perp.clone().multiplyScalar(-0.26)).setY(tableTopY+0.05);
-    mkArm(shoulderBase.clone().add(perp.clone().multiplyScalar(-0.24)), gunHand);
-    // free hand — rests flat on the felt on the opposite side
-    const restHand = dirOut.clone().multiplyScalar(0.8).add(perp.clone().multiplyScalar(0.27)).setY(tableTopY+0.03);
-    mkArm(shoulderBase.clone().add(perp.clone().multiplyScalar(0.24)), restHand);
-  }
-}
 async function loadWorld(){
   const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
@@ -1665,7 +1626,6 @@ scene.add(ch);
     revolverHome.copy(revolver.position);
   }
   buildSeatGuns();
-  buildSeatArms();
   buildTableCards();
   worldReady = true;
 }
