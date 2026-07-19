@@ -1490,6 +1490,59 @@ function makeRevolverModel(){
 let table=null, revolver=null, tableTopY=0.95, worldReady=false, cardBackTex=null;
 const cards=[];
 const revolverHome = new THREE.Vector3(0.28, 0, 0.15);
+
+/* ---- per-seat sidearms: every seat keeps their own iron on the felt ----
+   Each player (you included) has a revolver lying within hand's reach on
+   the table in front of them. During the vote, as each voter's choice is
+   revealed, their gun lifts and swings to point at whoever they voted for
+   — the whole table ends up in a standoff until the shot resolves. The
+   center revolver stays the execution piece; these are the threat props. */
+const seatGuns = [];
+// flat (pitch-free) aim: same roll-safe lookAt + fixed axis-remap approach
+// as executeSeat, but the target is projected to the gun's own height so
+// the gun swivels on the felt instead of tilting up off it
+function gunFlatAimEuler(gun, target){
+  const dummy = new THREE.Object3D();
+  dummy.position.copy(gun.position);
+  dummy.up.set(0,1,0);
+  dummy.lookAt(target.x, gun.position.y, target.z);
+  const barrelLocal = (revolver.userData.barrelAxis || new THREE.Vector3(0,0,1)).clone().multiplyScalar(GUN_BARREL_SIGN);
+  const remap = new THREE.Quaternion().setFromUnitVectors(barrelLocal, new THREE.Vector3(0,0,-1));
+  const q = dummy.quaternion.clone().multiply(remap);
+  return new THREE.Euler().setFromQuaternion(q, "XYZ");
+}
+function buildSeatGuns(){
+  for(const gun of seatGuns) if(gun) scene.remove(gun);
+  seatGuns.length = 0;
+  for(const i of ALL_SEATS){
+    const gun = revolver.clone(true);
+    const dir = SEATS[i].pos.clone().setY(0).normalize();
+    const perp = new THREE.Vector3(-dir.z, 0, dir.x);
+    const base = dir.multiplyScalar(0.82).add(perp.multiplyScalar(-0.26));
+    gun.position.set(base.x, revolverHome.y, base.z);
+    // resting: flat on the felt, barrel loosely toward the middle with a
+    // careless off-angle so the table doesn't look like a synchronized drill
+    const e = gunFlatAimEuler(gun, new THREE.Vector3(0,0,0));
+    gun.rotation.set(e.x, e.y + (rng()-0.5)*0.7, e.z);
+    gun.userData.rest = { pos: gun.position.clone(), rot: {x:gun.rotation.x, y:gun.rotation.y, z:gun.rotation.z} };
+    enableShadow(gun);
+    scene.add(gun);
+    seatGuns[i] = gun;
+  }
+}
+async function aimSeatGun(voter, target){
+  const gun = seatGuns[voter]; if(!gun) return;
+  const tpos = target===0 ? new THREE.Vector3(0,0,1.3) : SEATS[target].pos.clone();
+  const e = gunFlatAimEuler(gun, tpos);
+  const up = gun.position.clone().setY(gun.userData.rest.pos.y + 0.05);
+  await tweenTo(gun, up, {x:e.x, y:e.y, z:e.z}, 340);
+}
+function restAllGuns(){
+  for(const gun of seatGuns){
+    if(!gun) continue;
+    tweenTo(gun, gun.userData.rest.pos, gun.userData.rest.rot, 550);
+  }
+}
 async function loadWorld(){
   const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
@@ -1570,6 +1623,7 @@ scene.add(ch);
     revolver.position.y += (surfY + 0.004) - gb.min.y;
     revolverHome.copy(revolver.position);
   }
+  buildSeatGuns();
   buildTableCards();
   worldReady = true;
 }
@@ -1656,7 +1710,14 @@ function newMatch(){
   G.impBonusClues = 0;
   // per-observer suspicion matrix (crew NPCs only use their own row)
   G.suspicion = ALL_SEATS.map(()=>new Array(SEAT_COUNT).fill(0));
-  for(const a of actors) if(a){ a.alive=true; a.slump=0; a.lean=0; }
+  for(const a of actors) if(a){ a.alive=true; a.slump=0; a.lean=0; a.talk=0; a.fidgetT=0; }
+  // every seat's sidearm snaps back to its resting spot for the fresh deal
+  for(const gun of seatGuns){
+    if(!gun) continue;
+    const r = gun.userData.rest;
+    gun.position.copy(r.pos);
+    gun.rotation.set(r.rot.x, r.rot.y, r.rot.z);
+  }
   for(let i=1;i<SEAT_COUNT;i++){ const p=plateEls[i]; if(p){ p.classList.remove("dead"); p.querySelector(".sus").textContent=""; } }
   // word map for scoring
   G.wordWeight = {};
@@ -1916,6 +1977,12 @@ async function npcSpeak(seat, text, extraThink=0){
   a.lean = 1;
   await sleep(think);
   showBubble(seat, npcName(npc), text, 2400);
+  a.talk = 2400;   // drives the talking head-bob in the update loop
+  // the rest of the table turns to look at whoever's speaking
+  for(const o of aliveSeats()){
+    if(o===seat || o===0 || !actors[o] || rng()<0.4) continue;
+    glanceAt(o, seat);
+  }
   await sleep(2400);
   a.lean = 0;
 }
@@ -2159,6 +2226,10 @@ async function runMatch(){
         if(h){
           showBubble(0, STR.you, h.w, 2000);
           registerWord(0,h.w);
+          // the table looks over when you speak, same as for anyone else
+          for(const o of aliveSeats()){
+            if(o!==0 && actors[o] && rng()<0.6) glanceAt(o, 0);
+          }
           await sleep(1400);
         }
       } else {
@@ -2199,6 +2270,7 @@ async function doVote(){
   // player votes via UI
   const myPick = await offerVote();
   votes[myPick]=(votes[myPick]||0)+1; chosenBy[0]=myPick;
+  aimSeatGun(0, myPick);   // your own iron comes up and points at your pick
   updateTallies(votes);
   await sleep(500);
   // npcs vote with reveal bubbles
@@ -2207,6 +2279,7 @@ async function doVote(){
     const t = npcVote(o);
     chosenBy[o]=t;
     glanceAt(o,t);
+    aimSeatGun(o, t);      // their revolver swings onto whoever they named
     await sleep(500+rng()*600);
     showBubble(o, npcName(actors[o].npc), nameOf(t), 1500);
     votes[t]=(votes[t]||0)+1;
@@ -2222,6 +2295,7 @@ async function doVote(){
     setBanner(STR.banner_tie, 2300);
     setPrompt(STR.prompt_revote);
     clearTray();
+    restAllGuns();          // dead even — everyone lowers their iron
     await sleep(2100);
     resolveBet(bet, null, false);
     return "tie";
@@ -2234,6 +2308,7 @@ async function doVote(){
   // not. No more "prove innocence" chance: being wrongly accused is a
   // real, permanent cost, not something you can roll your way out of.
   await executeSeat(victim, wasImp);
+  restAllGuns();            // the shot's fired — the standoff breaks
   setBanner(fmt(wasImp?STR.banner_was_imposter:STR.banner_was_innocent,{n:nameOf(victim)}), 2200);
   if(victim!==0){ const p=plateEls[victim]; if(p) p.classList.add("dead"); }
   await sleep(2300);
@@ -2311,13 +2386,36 @@ function update(dt){
     a.slump += (targetSlump-a.slump)*0.03;
     a.glance = Math.max(0, a.glance - dt*0.0007);
     const g = a.glance>0 ? Math.sin(Math.min(1,a.glance)*Math.PI)*a.glanceDir*0.55 : 0;
+    // talking: while their speech bubble is up, a quick head-bob and a
+    // slight side tilt — reads as actually saying the word, not freezing
+    let talkNod = 0, talkTilt = 0;
+    if(a.talk>0 && a.alive){
+      a.talk -= dt;
+      talkNod  = Math.sin(clock.t*0.024)*0.028;
+      talkTilt = Math.sin(clock.t*0.017)*0.02;
+    }
+    // idle fidget: every few seconds a brief weight-shift in the chair, so
+    // nobody sits perfectly still like a mannequin between turns
+    if(a.alive){
+      if(a.nextFidget===undefined) a.nextFidget = clock.t + 2000 + rng()*5000;
+      if(clock.t >= a.nextFidget){
+        a.fidgetT = 700; a.fidgetDir = rng()<0.5?-1:1;
+        a.nextFidget = clock.t + 3500 + rng()*6000;
+      }
+    }
+    let fidget = 0;
+    if(a.fidgetT>0){
+      a.fidgetT -= dt;
+      fidget = Math.sin((1 - Math.max(0,a.fidgetT)/700)*Math.PI) * 0.045 * (a.fidgetDir||1);
+    }
     // a dead seat's "slump" used to pitch forward 1.15rad (~66°) and sink
     // 0.35 units — enough to rotate/drop the body down into (and behind)
     // the table geometry from most camera angles instead of reading as
     // "gone limp in their chair". Toned down to a believable head-down
     // slump that stays above the tabletop.
-    a.inner.rotation.x = a._leanCur + a.slump*0.45 + breatheAmt*0.4;
+    a.inner.rotation.x = a._leanCur + a.slump*0.45 + breatheAmt*0.4 + talkNod;
     a.inner.rotation.y = g;
+    a.inner.rotation.z = talkTilt + fidget;
     a.inner.position.y = (a.baseY||0) - a.slump*0.1;
     a.inner.scale.y = a.inner.scale.x * (1+breatheAmt); // uses normalize's uniform scale as base
   }
