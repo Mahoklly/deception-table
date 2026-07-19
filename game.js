@@ -1543,6 +1543,45 @@ function restAllGuns(){
     tweenTo(gun, gun.userData.rest.pos, gun.userData.rest.rot, 550);
   }
 }
+/* ---- arms on the table: every seat keeps both hands visible ----
+   The character models are static meshes (no arm bones to pose), so the
+   "hand on the gun" is built as real procedural geometry: a sleeved
+   forearm sloping from each figure's shoulder down onto the felt — one
+   hand cupped over their revolver's grip, the free hand resting flat on
+   the table on the other side. The player's seat gets the same pair, so
+   your own hands are visible at the bottom edge in first person. */
+function buildSeatArms(){
+  const sleeve = new THREE.MeshStandardMaterial({color:0x2f2218, roughness:0.9});
+  const skin   = new THREE.MeshStandardMaterial({color:0xcfae87, roughness:0.8});
+  const mkArm = (from, to)=>{
+    const dir = to.clone().sub(from), len = dir.length();
+    const arm = new THREE.Group();
+    const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.05, len, 8), sleeve);
+    limb.position.y = len/2; arm.add(limb);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), skin);
+    hand.scale.set(1, 0.55, 1.25);
+    hand.position.y = len; arm.add(hand);
+    arm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+    arm.position.copy(from);
+    enableShadow(arm);
+    scene.add(arm);
+  };
+  for(const i of ALL_SEATS){
+    const seat = SEATS[i];
+    const dirOut = seat.pos.clone().setY(0).normalize();
+    const perp = new THREE.Vector3(-dirOut.z, 0, dirOut.x);
+    const shoulderBase = seat.pos.clone().setY(1.02).add(dirOut.clone().multiplyScalar(-0.08));
+    // gun hand — comes down over the revolver's grip (same side buildSeatGuns
+    // parks the gun on: the -perp side of the seat)
+    const gunHand = seatGuns[i]
+      ? seatGuns[i].userData.rest.pos.clone().add(new THREE.Vector3(0, 0.045, 0))
+      : dirOut.clone().multiplyScalar(0.82).add(perp.clone().multiplyScalar(-0.26)).setY(tableTopY+0.05);
+    mkArm(shoulderBase.clone().add(perp.clone().multiplyScalar(-0.24)), gunHand);
+    // free hand — rests flat on the felt on the opposite side
+    const restHand = dirOut.clone().multiplyScalar(0.8).add(perp.clone().multiplyScalar(0.27)).setY(tableTopY+0.03);
+    mkArm(shoulderBase.clone().add(perp.clone().multiplyScalar(0.24)), restHand);
+  }
+}
 async function loadWorld(){
   const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
@@ -1606,8 +1645,10 @@ scene.add(ch);
   revolver.userData.barrelAxis = gGun ? (gunMesh.userData.barrelAxis || new THREE.Vector3(0,0,1)) : new THREE.Vector3(1,0,0);
   enableShadow(revolver);
   revolver.position.copy(revolverHome); revolver.rotation.y = rng()*6.28;
-  scene.add(revolver);
-  // hard-drop the revolver onto the real table surface (measured, not guessed)
+  // NOTE: the center revolver is no longer added to the scene — each seat
+  // has its own gun now (see buildSeatGuns) and executions use the
+  // condemned seat's own iron. This object stays as the clone source and
+  // for the surface-height measurement below (which sets the guns' rest y).
   revolver.updateMatrixWorld(true);
   {
     let surfY = tableTopY;
@@ -1624,6 +1665,7 @@ scene.add(ch);
     revolverHome.copy(revolver.position);
   }
   buildSeatGuns();
+  buildSeatArms();
   buildTableCards();
   worldReady = true;
 }
@@ -1997,21 +2039,24 @@ function glanceAt(observer, target){
 // axis-detection in layFlat can't tell barrel from grip on its own). If
 // the gun ever aims exactly backward again, this is the one thing to flip.
 const GUN_BARREL_SIGN = 1;
+/* the execution now uses the condemned seat's OWN revolver — the one lying
+   in front of them on the felt. It rises off the table in front of them,
+   turns back on its owner, holds the beat, and fires. No shared center
+   gun anymore; the sentence arrives from your own iron, roulette-style. */
 async function executeSeat(victim, wasImp){
   play("drum");
-  // revolver rises and aims
-  const target = victim===0 ? new THREE.Vector3(0,1.25,1.3) : SEATS[victim].pos.clone().setY(1.25);
-  const up = new THREE.Vector3(0, revolverHome.y+0.55, 0);
-  // aim via quaternion, built the roll-safe way: setFromUnitVectors alone
-  // finds *a* rotation that points the barrel at the target, but it's free
-  // to pick any roll (twist around the barrel) to get there — which is
-  // exactly why the gun was showing up canted at odd angles instead of
-  // held level. lookAt() resolves that ambiguity properly using an explicit
-  // up vector, so: get lookAt's roll-safe rotation (which points local -Z
-  // at the target), then compose it with a *fixed* correction that maps
-  // our detected barrel axis onto -Z. That fixed correction is the same
-  // every time (doesn't depend on the target), so it can't reintroduce the
-  // per-shot roll wobble the way doing this in one step did.
+  const gun = seatGuns[victim] || revolver;
+  const headY = 1.25;
+  const target = victim===0 ? new THREE.Vector3(0, headY, 1.45) : SEATS[victim].pos.clone().setY(headY);
+  // hover point: pulled in toward the table center from the victim's seat,
+  // raised near head height, so the muzzle faces back at its owner
+  const up = victim===0
+    ? new THREE.Vector3(0.12, headY-0.1, 0.75)
+    : SEATS[victim].pos.clone().multiplyScalar(0.55).setY(headY-0.1);
+  // aim via quaternion, built the roll-safe way: lookAt() gives a roll-free
+  // rotation pointing local -Z at the target; compose it with the fixed
+  // correction that maps the detected barrel axis onto -Z (see the vote
+  // guns' gunFlatAimEuler for the same approach, minus the pitch).
   const _dummy = new THREE.Object3D();
   _dummy.position.copy(up);
   _dummy.up.set(0,1,0);
@@ -2020,30 +2065,27 @@ async function executeSeat(victim, wasImp){
   const axisRemap = new THREE.Quaternion().setFromUnitVectors(barrelLocal, new THREE.Vector3(0,0,-1));
   const aimQuat = _dummy.quaternion.clone().multiply(axisRemap);
   const aimEuler = new THREE.Euler().setFromQuaternion(aimQuat, "XYZ");
-  await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 1000); // slow level lift
-  await tweenTo(revolver, up, {x:aimEuler.x, y:aimEuler.y, z:aimEuler.z}, 700); // swing onto the target
-  await sleep(900);                                                      // the dramatic pause
+  await tweenTo(gun, gun.position.clone().add(new THREE.Vector3(0,0.3,0)), {x:0, y:gun.rotation.y, z:0}, 900); // slow level lift off the felt
+  await tweenTo(gun, up, {x:aimEuler.x, y:aimEuler.y, z:aimEuler.z}, 700);   // turns back on its owner
+  await sleep(900);                                                          // the dramatic pause
 
   // the majority vote is final — whoever's picked is out, guilty or not.
-  // No more "prove innocence" roll or typing check (see doVote for the
-  // separate consequences dealt to the table when the vote turns out to
-  // have been wrong).
   play("shot");
   flash();
-  gunKick();
+  gunKick(gun);
   actors[victim].alive = false;
   await loseChipsToTable(victim);
   await sleep(wasImp ? 3000 : 2000);
 
-  // settle back down to the table, flat
-  await tweenTo(revolver, up, {x:0, y:revolver.rotation.y, z:0}, 450);
-  await tweenTo(revolver, revolverHome, {x:0, y:rng()*6.28, z:0}, 800);
+  // the gun drops back onto the felt where it always sat
+  const rest = gun.userData.rest || { pos: revolverHome, rot: {x:0, y:rng()*6.28, z:0} };
+  await tweenTo(gun, rest.pos, rest.rot, 700);
 }
-async function gunKick(){
-  const r0={x:revolver.rotation.x, y:revolver.rotation.y, z:revolver.rotation.z};
-  const p0=revolver.position.clone();
-  await tweenTo(revolver, p0.clone().add(new THREE.Vector3(0,0.07,0)), {x:r0.x-0.4, y:r0.y, z:r0.z}, 70);
-  await tweenTo(revolver, p0, r0, 280);
+async function gunKick(gun){
+  const r0={x:gun.rotation.x, y:gun.rotation.y, z:gun.rotation.z};
+  const p0=gun.position.clone();
+  await tweenTo(gun, p0.clone().add(new THREE.Vector3(0,0.07,0)), {x:r0.x-0.4, y:r0.y, z:r0.z}, 70);
+  await tweenTo(gun, p0, r0, 280);
 }
 
 /* ---------------- chairs ---------------- */
