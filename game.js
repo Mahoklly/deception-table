@@ -2,9 +2,10 @@
 // three.js scene + HTML overlay UI. Fixed-timestep sim, seeded RNG, command-object input.
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/addons/GLTFLoader.js";
-import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260718a";
-import { DECK, NPCS, RULES } from "./data.js?v=20260718a";
-import { ASSET_URLS } from "./assets_urls.js";
+import { MeshoptDecoder } from "./vendor/addons/libs/meshopt_decoder.module.js";
+import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260719a";
+import { DECK, NPCS, RULES } from "./data.js?v=20260719a";
+import { ASSET_URLS } from "./assets_urls.js?v=20260719a";
 const assetSrc = (key, rel) => ASSET_URLS[key] || ("./assets/"+rel);
 
 /* ---------------- seeded RNG (determinism §12.1) ---------------- */
@@ -927,8 +928,11 @@ function buildRoadhouseBar(){
   // scattered high-top tables, each with a worn stool — one of them tipped
   // over, because a real dive bar's furniture doesn't all stand up straight
   const cocktailSpots = [];
+  const cocktailTables = [];
   const cocktail = (x, z, toppleStool=false)=>{
     const grp = new THREE.Group();
+    grp.name = "cocktailTable";
+    cocktailTables.push(grp);
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.04, 14), steel);
     base.position.y = 0.02; grp.add(base);
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.95, 8), steel);
@@ -987,7 +991,7 @@ function buildRoadhouseBar(){
 
   scene.add(g);
   enableShadow(g);
-  return { group:g, cocktailSpots };
+  return { group:g, cocktailSpots, cocktailTables, makeBottle, bottleColors };
 }
 const roadhouse = buildRoadhouseBar();
 
@@ -1063,6 +1067,7 @@ const SEATS_FULLHOUSE = [
 ];
 const SEATS = SEAT_COUNT===6 ? SEATS_FULLHOUSE : SEATS_CLASSIC;
 const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder); // Meshy exports are meshopt-compressed (57MB → <1MB total)
 function loadGLB(key, file){ return new Promise(res=>loader.load(assetSrc(key,file), g=>res(g.scene), undefined, ()=>res(null))); }
 function normalize(obj, targetH, groundY=0){
   const box = new THREE.Box3().setFromObject(obj);
@@ -1544,14 +1549,88 @@ function restAllGuns(){
   }
 }
 async function loadWorld(){
-  const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun] = await Promise.all([
+  const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun, gShelf, gBartender, gBgTable] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
     loadGLB("table_tavern","table_tavern.glb"), loadGLB("char_brute","char_brute.glb"),
     loadGLB("char_widow","char_widow.glb"), loadGLB("char_fox","char_fox.glb"),
     SEAT_COUNT>4 ? loadGLB("char_hawk","char_hawk.glb") : Promise.resolve(null),
     SEAT_COUNT>4 ? loadGLB("char_crow","char_crow.glb") : Promise.resolve(null),
     loadGLB("revolver","revolver.glb"),
+    loadGLB("liquor_shelf","liquor_shelf.glb"),
+    loadGLB("bartender","bartender.glb"),
+    loadGLB("bg_table","bg_table.glb"),
   ]);
+  // ---- Meshy-generated set dressing: each of these swaps out a procedural
+  // stand-in built in buildRoadhouseBar()/buildBackgroundLife(). The
+  // procedural versions stay as the fallback if a file is missing. ----
+  if(gShelf){
+    // the real carved-wood back-bar unit: four copies side by side spanning
+    // the counter, then the glowing bottles re-shelved onto its actual
+    // boards (measured from the model: board tops at y ≈ -0.47 / 0.00 /
+    // +0.30 in its -0.95..0.95 local space)
+    const unit = scene.getObjectByName("liquorShelf");
+    if(unit){
+      unit.clear();
+      const S = 1.42; // model is 1.9 units tall → 2.7m, cornice under the ceiling joists
+      for(const ux of [-2.26, -0.755, 0.755, 2.26]){
+        const inst = gShelf.clone(true);
+        inst.scale.setScalar(S);
+        inst.position.set(ux, 0.95*S, 0.26);
+        unit.add(inst);
+      }
+      const rows = [[-0.47, 0.55], [0.0, 0.35], [0.30, 0.35]]; // [board y, bottle height variance] — upper cavities are shorter
+      for(const [my, hv] of rows){
+        const wy = (my + 0.95) * S;
+        for(const ux of [-2.26, -0.755, 0.755, 2.26]){
+          const n = 6;
+          for(let i=0;i<n;i++){
+            const bx = ux - 0.55 + i*(1.1/(n-1)) + (Math.random()-0.5)*0.05;
+            const bottle = roadhouse.makeBottle(
+              roadhouse.bottleColors[(i + ((wy*7)|0)) % roadhouse.bottleColors.length],
+              0.7 + Math.random()*hv);
+            bottle.position.set(bx, wy + 0.02, 0.34);
+            bottle.rotation.y = Math.random()*0.4;
+            unit.add(bottle);
+          }
+        }
+        const strip = new THREE.PointLight(0xffc070, 0.55, 2.2, 2);
+        strip.position.set(0, wy + 0.45, 0.6); unit.add(strip);
+      }
+      enableShadow(unit);
+    }
+  }
+  if(gBartender){
+    // the real bartender model replaces the placeholder capsule, same spot
+    // in the aisle behind the counter, same idle bob
+    const old = scene.getObjectByName("bartender");
+    if(old){
+      const sc = 0.96; // model is 1.9 units tall, centered at origin → ~1.82m on his feet
+      gBartender.name = "bartender";
+      gBartender.scale.setScalar(sc);
+      gBartender.position.copy(old.position);
+      gBartender.position.y = 0.95*sc;
+      gBartender.rotation.y = old.rotation.y;
+      scene.remove(old);
+      scene.add(enableShadow(gBartender));
+      const f = bgFigures.find(f=>f.obj===old);
+      if(f){ f.obj = gBartender; f.baseY = 0.95*sc; }
+    }
+  }
+  if(gBgTable){
+    // the real pub table replaces each procedural high-top. The export came
+    // through untextured, so it gets a dark-wood material in code — reads
+    // fine in the dim room, and the wrought-iron base just goes near-black.
+    const tblMat = new THREE.MeshStandardMaterial({color:0x4a2c16, roughness:0.75, metalness:0.15});
+    gBgTable.traverse(o=>{ if(o.isMesh) o.material = tblMat; });
+    for(const tbl of roadhouse.cocktailTables){
+      tbl.clear();
+      const inst = gBgTable.clone(true);
+      inst.scale.set(0.45, 0.81, 0.45); // squeeze the 1.9-wide model to high-top proportions; top lands at y≈1.0 like the old one
+      inst.position.y = 0.62*0.81;
+      tbl.add(inst);
+      enableShadow(tbl);
+    }
+  }
   // swap the procedural box/beam room for a Higgsfield-generated one, if hooked up
   if(gRoom){
     if(roomGroup) scene.remove(roomGroup);

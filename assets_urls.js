@@ -9,6 +9,9 @@ export const ASSET_URLS = {
   tex_posters: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260716_210139_3d6d33c5-4917-4ccd-9cbc-1d0849b1c0f0.png",
   tex_backlit_shelf: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070850_0061aa79-f789-4303-bae7-1b86b7bef554.png",
   room_bar_shelf: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/e58345df-52c6-4bef-bce7-e5af28cb6916.glb",
+  liquor_shelf: "", // Meshy-generated back-bar shelf unit — served locally from ./assets/liquor_shelf.glb (meshopt-compressed)
+  bartender: "", // Meshy-generated bartender character — served locally from ./assets/bartender.glb (meshopt-compressed)
+  bg_table: "", // Meshy-generated pub table for the background high-tops — served locally from ./assets/bg_table.glb (meshopt-compressed; shipped untextured, tinted in code)
   char_brute: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/d134ef7d-8897-429d-ba67-8a2ca0ea9484.glb",
   char_widow: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/eca7c860-910f-4e08-acc1-b5cfee087784.glb",
   char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",
