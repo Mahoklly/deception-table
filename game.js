@@ -3,9 +3,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/addons/GLTFLoader.js";
 import { MeshoptDecoder } from "./vendor/addons/libs/meshopt_decoder.module.js";
-import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260719c";
-import { DECK, NPCS, RULES } from "./data.js?v=20260719c";
-import { ASSET_URLS } from "./assets_urls.js?v=20260719c";
+import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260720a";
+import { DECK, NPCS, RULES } from "./data.js?v=20260720a";
+import { ASSET_URLS } from "./assets_urls.js?v=20260720a";
 const assetSrc = (key, rel) => ASSET_URLS[key] || ("./assets/"+rel);
 
 /* ---------------- seeded RNG (determinism §12.1) ---------------- */
@@ -1653,33 +1653,25 @@ async function loadWorld(){
       enableShadow(st);
     }
   }
-  // NPC characters — all five came back untextured from Meshy (single mesh,
-  // zero images). First pass tinted them with "realistic" dark clothing
-  // colors (near-black coat, near-black dress) and against this room's dim
-  // ambient + distant candle/fill lights they read as solid black
-  // silhouettes with zero visible shape — unusable. Switched to each NPC's
-  // own established chip color (data.js) instead: same colors already
-  // proven legible here (the old placeholder capsules used them), and it
-  // ties each model to their existing brand color rather than guessing a
-  // second one.
+  // NPC characters — Gruff Halloran, Madame Vey and Silky Marlowe now come
+  // in from Meshy fully textured with real normals, so they render as-is,
+  // no tinting needed. Deacon Rourke and Old Ma Kessler (Full House mode,
+  // deprioritized for now) are still the older untextured exports, which
+  // need the flat chip-color tint + computed normals fallback below or
+  // they render as solid black silhouettes (see the fix history: without
+  // normal data, MeshStandardMaterial's N·L term degenerates to ~0 against
+  // this room's point lights, leaving only the flat ambient term).
   const charTint = (g, hex, rough=0.75)=>{
     if(!g) return;
     const mat = new THREE.MeshStandardMaterial({color:hex, roughness:rough, metalness:0.05});
     g.traverse(o=>{
       if(!o.isMesh) return;
-      // these exports carry zero normal data — MeshStandardMaterial's N·L
-      // lighting term then degenerates to ~0 against every point light in
-      // this room (candle/fill/etc), leaving only the flat ambient term and
-      // reading as a near-black silhouette regardless of tint color
       if(!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
       o.material = mat;
     });
   };
-  charTint(gBrute, 0xb98a4f);  // Gruff Halloran
-  charTint(gWidow, 0x9c6b7c);  // Madame Vey
-  charTint(gFox,   0x8fa06b);  // Silky Marlowe
-  charTint(gHawk,  0x5c6b78);  // Deacon Rourke
-  charTint(gCrow,  0x4a3a52);  // Old Ma Kessler
+  charTint(gHawk, 0x5c6b78);  // Deacon Rourke
+  charTint(gCrow, 0x4a3a52);  // Old Ma Kessler
 
   // swap the procedural box/beam room for a Higgsfield-generated one, if hooked up
   if(gRoom){
