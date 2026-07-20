@@ -3,9 +3,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/addons/GLTFLoader.js";
 import { MeshoptDecoder } from "./vendor/addons/libs/meshopt_decoder.module.js";
-import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260720a";
-import { DECK, NPCS, RULES } from "./data.js?v=20260720a";
-import { ASSET_URLS } from "./assets_urls.js?v=20260720a";
+import { STR, fmt, getLang, setLang, LANG_LABELS } from "./strings.js?v=20260720b";
+import { DECK, NPCS, RULES } from "./data.js?v=20260720b";
+import { ASSET_URLS } from "./assets_urls.js?v=20260720b";
 const assetSrc = (key, rel) => ASSET_URLS[key] || ("./assets/"+rel);
 
 /* ---------------- seeded RNG (determinism §12.1) ---------------- */
@@ -1322,7 +1322,21 @@ function makeChipTex(hex){
   chipTexCache[hex] = t;
   return t;
 }
+let coinTemplate = null; // set once the real Meshy coin model finishes loading (see loadWorld)
+const coinMatCache = {};
+function coinMatFor(hex){
+  if(coinMatCache[hex]) return coinMatCache[hex];
+  const m = coinTemplate.userData.baseMat.clone();
+  m.color.setHex(hex);
+  coinMatCache[hex] = m;
+  return m;
+}
 function makeChip(hex){
+  if(coinTemplate){
+    const inst = coinTemplate.clone(true);
+    inst.traverse(o=>{ if(o.isMesh) o.material = coinMatFor(hex); });
+    return inst;
+  }
   const face = new THREE.MeshStandardMaterial({map: makeChipTex(hex), roughness:0.35});
   const side = new THREE.MeshStandardMaterial({color:hex, roughness:0.45});
   const chip = new THREE.Mesh(new THREE.CylinderGeometry(0.046,0.046,0.013,22,1), [side, face, face]);
@@ -1552,7 +1566,7 @@ function restAllGuns(){
   }
 }
 async function loadWorld(){
-  const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun, gShelf, gBartender, gBgTable, gBarStool] = await Promise.all([
+  const [gRoom, gTable, gBrute, gWidow, gFox, gHawk, gCrow, gGun, gShelf, gBartender, gBgTable, gBarStool, gCoin] = await Promise.all([
     loadGLB("room_tavern","room_tavern.glb"),
     loadGLB("table_tavern","table_tavern.glb"), loadGLB("char_brute","char_brute.glb"),
     loadGLB("char_widow","char_widow.glb"), loadGLB("char_fox","char_fox.glb"),
@@ -1563,6 +1577,7 @@ async function loadWorld(){
     loadGLB("bartender","bartender.glb"),
     loadGLB("bg_table","bg_table.glb"),
     loadGLB("bar_stool","bar_stool.glb"),
+    loadGLB("coin","coin.glb"),
   ]);
   // ---- Meshy-generated set dressing: each of these swaps out a procedural
   // stand-in built in buildRoadhouseBar()/buildBackgroundLife(). The
@@ -1652,6 +1667,27 @@ async function loadWorld(){
       st.add(inst);
       enableShadow(st);
     }
+  }
+  if(gCoin){
+    // real poker-chip model, generated blank (no baked color/pattern) on
+    // purpose — the shop's 4 chip-color themes (Classic/Neon/Noir/Gold)
+    // recolor chips live by re-tinting a material, so a chip with a baked
+    // design couldn't be recolored. Keeping its own baked map (a neutral
+    // grey/white shading pass that carries the rim-groove ambient
+    // occlusion) and just multiplying that by the palette color per
+    // instance preserves the groove shading while still letting it change
+    // color, instead of overwriting the material outright.
+    gCoin.rotation.x = -Math.PI/2; // model's thin axis is Z (flat disc) — same fix as layFlat's z-branch, bring it up to +Y
+    const dia = Math.max(new THREE.Box3().setFromObject(gCoin).getSize(new THREE.Vector3()).x,
+                          new THREE.Box3().setFromObject(gCoin).getSize(new THREE.Vector3()).z);
+    gCoin.scale.setScalar(0.092/dia); // match the old procedural chip's 0.046 radius
+    const c = new THREE.Box3().setFromObject(gCoin).getCenter(new THREE.Vector3());
+    gCoin.position.sub(c);
+    let baseMat = null;
+    gCoin.traverse(o=>{ if(o.isMesh && !baseMat) baseMat = o.material; });
+    coinTemplate = new THREE.Group();
+    coinTemplate.add(gCoin);
+    coinTemplate.userData.baseMat = baseMat;
   }
   // NPC characters — Gruff Halloran, Madame Vey and Silky Marlowe now come
   // in from Meshy fully textured with real normals, so they render as-is,

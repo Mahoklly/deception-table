@@ -13,13 +13,14 @@ export const ASSET_URLS = {
   bartender: "", // Meshy-generated bartender character — served locally from ./assets/bartender.glb (meshopt-compressed)
   bg_table: "", // Meshy-generated pub table for the background high-tops — served locally from ./assets/bg_table.glb (meshopt-compressed; shipped untextured, tinted in code)
   bar_stool: "", // Meshy-generated bar stool (replaces every procedural one) — served locally from ./assets/bar_stool.glb (meshopt-compressed; shipped untextured, tinted in code)
-  char_brute: "", // Gruff Halloran — Meshy-generated, served locally from ./assets/char_brute.glb (meshopt-compressed; shipped untextured, tinted in code)
-  char_widow: "", // Madame Vey — served locally from ./assets/char_widow.glb (meshopt-compressed; shipped untextured, tinted in code)
-  char_fox: "", // Silky Marlowe — served locally from ./assets/char_fox.glb (meshopt-compressed; shipped untextured, tinted in code)
+  char_brute: "", // Gruff Halloran — Meshy-generated, fully textured, served locally from ./assets/char_brute.glb (full quality, uncompressed)
+  char_widow: "", // Madame Vey — served locally from ./assets/char_widow.glb (full quality, uncompressed)
+  char_fox: "", // Silky Marlowe — served locally from ./assets/char_fox.glb (full quality, uncompressed)
   char_hawk: "", // Deacon Rourke (Full House) — served locally from ./assets/char_hawk.glb (meshopt-compressed; shipped untextured, tinted in code)
   char_crow: "", // Old Ma Kessler (Full House) — served locally from ./assets/char_crow.glb (meshopt-compressed; shipped untextured, tinted in code)
   table_tavern: "", // old table retired — using the new procedural poker-table design (makePokerTable in game.js) until a fresh GLB is hooked up here
-  revolver: "", // now served locally from ./assets/revolver.glb (the user pushed the real file to the repo) instead of depending on the CDN
+  revolver: "", // Meshy-generated revolver, served locally from ./assets/revolver.glb (full quality, uncompressed)
+  coin: "", // Meshy-generated blank poker chip (no baked color, so the shop's chip-color themes can still recolor it) — served locally from ./assets/coin.glb (full quality, uncompressed)
   ref_table: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070848_b5c9817c-c548-4b79-b5ca-0708a1f606a3.png", // reference photo for Meshy image-to-3D — run this through Meshy yourself, send back the .glb URL
   ref_revolver: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070849_d963749d-ba20-4cbe-b622-05cb9c8f5b7c.png", // reference photo for Meshy image-to-3D
   ref_bartender: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070844_a28fc51a-6d58-4488-bc91-35dce5fcd390.png", // reference photo for Meshy image-to-3D
