@@ -13,11 +13,11 @@ export const ASSET_URLS = {
   bartender: "", // Meshy-generated bartender character — served locally from ./assets/bartender.glb (meshopt-compressed)
   bg_table: "", // Meshy-generated pub table for the background high-tops — served locally from ./assets/bg_table.glb (meshopt-compressed; shipped untextured, tinted in code)
   bar_stool: "", // Meshy-generated bar stool (replaces every procedural one) — served locally from ./assets/bar_stool.glb (meshopt-compressed; shipped untextured, tinted in code)
-  char_brute: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/d134ef7d-8897-429d-ba67-8a2ca0ea9484.glb",
-  char_widow: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/eca7c860-910f-4e08-acc1-b5cfee087784.glb",
-  char_fox: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/18400be5-ba08-40d5-8814-c2816fecf065.glb",
-  char_hawk: "", // Full House mode's 4th NPC (Deacon Rourke) — drop a Meshy-generated char_hawk.glb URL here; falls back to a procedural placeholder capsule until then
-  char_crow: "", // Full House mode's 5th NPC (Old Ma Kessler) — same deal, drop a char_crow.glb URL here
+  char_brute: "", // Gruff Halloran — Meshy-generated, served locally from ./assets/char_brute.glb (meshopt-compressed; shipped untextured, tinted in code)
+  char_widow: "", // Madame Vey — served locally from ./assets/char_widow.glb (meshopt-compressed; shipped untextured, tinted in code)
+  char_fox: "", // Silky Marlowe — served locally from ./assets/char_fox.glb (meshopt-compressed; shipped untextured, tinted in code)
+  char_hawk: "", // Deacon Rourke (Full House) — served locally from ./assets/char_hawk.glb (meshopt-compressed; shipped untextured, tinted in code)
+  char_crow: "", // Old Ma Kessler (Full House) — served locally from ./assets/char_crow.glb (meshopt-compressed; shipped untextured, tinted in code)
   table_tavern: "", // old table retired — using the new procedural poker-table design (makePokerTable in game.js) until a fresh GLB is hooked up here
   revolver: "", // now served locally from ./assets/revolver.glb (the user pushed the real file to the repo) instead of depending on the CDN
   ref_table: "https://d8j0ntlcm91z4.cloudfront.net/user_3GYSPUl3vuJmpnWL91vihi2v6ZQ/hf_20260717_070848_b5c9817c-c548-4b79-b5ca-0708a1f606a3.png", // reference photo for Meshy image-to-3D — run this through Meshy yourself, send back the .glb URL
